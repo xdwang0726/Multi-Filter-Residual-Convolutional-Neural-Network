@@ -31,14 +31,15 @@ def train(args, model, optimizer, epoch, gpu, data_loader):
             output, loss = model(inputs_id, segments, masks, labels)
         else:
 
-            inputs_id, labels, text_inputs = next(data_iter)
+            inputs_id, labels = next(data_iter)
 
             inputs_id, labels = torch.LongTensor(inputs_id), torch.FloatTensor(labels)
 
             if gpu >= 0:
-                inputs_id, labels, text_inputs = inputs_id.cuda(gpu), labels.cuda(gpu), text_inputs.cuda(gpu)
+                inputs_id, labels = inputs_id.cuda(gpu), labels.cuda(gpu)
 
-            output, loss = model(inputs_id, labels, text_inputs)
+            # output, loss = model(inputs_id, labels, text_inputs)
+            output, loss = model(inputs_id, labels)
 
         optimizer.zero_grad()
         loss.backward()

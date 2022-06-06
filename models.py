@@ -47,14 +47,14 @@ class WordRep(nn.Module):
                      }
 
 
-    def forward(self, x, target, text_inputs):
+    def forward(self, x, target):
 
         features = [self.embed(x)]
 
-        if self.use_elmo:
-            elmo_outputs = self.elmo(text_inputs)
-            elmo_outputs = elmo_outputs['elmo_representations'][0]
-            features.append(elmo_outputs)
+        # if self.use_elmo:
+        #     elmo_outputs = self.elmo(text_inputs)
+        #     elmo_outputs = elmo_outputs['elmo_representations'][0]
+        #     features.append(elmo_outputs)
 
         x = torch.cat(features, dim=2)
 
@@ -76,7 +76,7 @@ class OutputLayer(nn.Module):
 
 
 
-    def forward(self, x, target, text_inputs):
+    def forward(self, x, target):
 
         alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
 
@@ -263,9 +263,10 @@ class MultiResCNN(nn.Module):
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
 
-    def forward(self, x, target, text_inputs):
+    def forward(self, x, target):
 
-        x = self.word_rep(x, target, text_inputs)
+        # x = self.word_rep(x, target, text_inputs)
+        x = self.word_rep(x, target)
 
         x = x.transpose(1, 2)
 
@@ -281,7 +282,7 @@ class MultiResCNN(nn.Module):
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
 
-        y, loss = self.output_layer(x, target, text_inputs)
+        y, loss = self.output_layer(x, target)
 
         return y, loss
 

@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import csv
 import sys
-from utils import load_lookups, prepare_instance, MyDataset, my_collate, my_collate_bert, early_stop, save_everything
+from utils import load_lookups, prepare_instance, MyDataset, my_collate, early_stop, save_everything
 from models import pick_model
 import torch.optim as optim
 from collections import defaultdict
