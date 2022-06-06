@@ -8,6 +8,7 @@ import gensim.models.fasttext as fasttext
 import codecs
 import re
 
+
 def gensim_to_embeddings(wv_file, vocab_file, Y, outfile=None):
     model = gensim.models.Word2Vec.load(wv_file)
     wv = model.wv
@@ -20,7 +21,7 @@ def gensim_to_embeddings(wv_file, vocab_file, Y, outfile=None):
             line = line.strip()
             if line != '':
                 vocab.add(line)
-    ind2w = {i+1:w for i,w in enumerate(sorted(vocab))}
+    ind2w = {i+1: w for i, w in enumerate(sorted(vocab))}
 
     W, words = build_matrix(ind2w, wv)
 
@@ -30,6 +31,7 @@ def gensim_to_embeddings(wv_file, vocab_file, Y, outfile=None):
     #smash that save button
     save_embeddings(W, words, outfile)
 
+
 def gensim_to_fasttext_embeddings(wv_file, vocab_file, Y, outfile=None):
     model = gensim.models.FastText.load(wv_file)
     wv = model.wv
@@ -38,11 +40,11 @@ def gensim_to_fasttext_embeddings(wv_file, vocab_file, Y, outfile=None):
 
     vocab = set()
     with open(vocab_file, 'r') as vocabfile:
-        for i,line in enumerate(vocabfile):
+        for i, line in enumerate(vocabfile):
             line = line.strip()
             if line != '':
                 vocab.add(line)
-    ind2w = {i+1:w for i,w in enumerate(sorted(vocab))}
+    ind2w = {i+1: w for i, w in enumerate(sorted(vocab))}
 
     W, words = build_matrix(ind2w, wv)
 
@@ -69,6 +71,7 @@ def build_matrix(ind2w, wv):
         words.append(word)
     return W, words
 
+
 def save_embeddings(W, words, outfile):
     with open(outfile, 'w') as o:
         #pad token already included
@@ -76,6 +79,7 @@ def save_embeddings(W, words, outfile):
             line = [words[i]]
             line.extend([str(d) for d in W[i]])
             o.write(" ".join(line) + "\n")
+
 
 def load_embeddings(embed_file):
     #also normalizes the embeddings
@@ -138,6 +142,7 @@ def fasttext_embeddings(Y, notes_file, embedding_size, min_count, n_iter):
     print("writing embeddings to %s" % (out_file))
     model.save(out_file)
     return out_file
+
 
 import operator
 def build_vocab(vocab_min, infile, vocab_filename):
@@ -308,6 +313,7 @@ def concat_data(labelsfile, notes_file, outfilename):
 
     return outfilename
 
+
 def split_data(labeledfile, base_name, mimic_dir):
     print("SPLITTING")
     #create and write headers for train, dev, test
@@ -417,6 +423,7 @@ def next_notes(notesfile):
             cur_text += " " + text
     yield cur_subj, cur_text, cur_hadm
 
+
 def load_vocab_dict(args, vocab_file):
     vocab = set()
 
@@ -433,7 +440,9 @@ def load_vocab_dict(args, vocab_file):
 
     return ind2w, w2ind
 
+
 from collections import defaultdict
+
 
 def load_full_codes(train_path, mimic2_dir, version='mimic3'):
 
@@ -461,6 +470,7 @@ def load_full_codes(train_path, mimic2_dir, version='mimic3'):
         ind2c = defaultdict(str, {i:c for i,c in enumerate(sorted(codes))})
     return ind2c
 
+
 def load_lookups(args):
 
     ind2w, w2ind = load_vocab_dict(args, args.vocab)
@@ -474,13 +484,14 @@ def load_lookups(args):
             lr = csv.reader(labelfile)
             for i,row in enumerate(lr):
                 codes.add(row[0])
-        ind2c = {i:c for i,c in enumerate(sorted(codes))}
+        ind2c = {i: c for i, c in enumerate(sorted(codes))}
 
     c2ind = {c:i for i,c in ind2c.items()}
 
     dicts = {'ind2w': ind2w, 'w2ind': w2ind, 'ind2c': ind2c, 'c2ind': c2ind}
 
     return dicts
+
 
 def prepare_instance(dicts, filename, args, max_length):
     ind2w, w2ind, ind2c, c2ind = dicts['ind2w'], dicts['w2ind'], dicts['ind2c'], dicts['c2ind']
@@ -521,68 +532,66 @@ def prepare_instance(dicts, filename, args, max_length):
                 tokens = tokens[:max_length]
                 tokens_id = tokens_id[:max_length]
 
-            dict_instance = {'label': labels_idx,
-                                 'tokens': tokens,
-                                 "tokens_id": tokens_id}
+            dict_instance = {'label': labels_idx, 'tokens': tokens, 'tokens_id': tokens_id}
 
             instances.append(dict_instance)
 
-
     return instances
+
 
 from pytorch_pretrained_bert import BertTokenizer
-def prepare_instance_bert(dicts, filename, args, max_length):
-    ind2w, w2ind, ind2c, c2ind = dicts['ind2w'], dicts['w2ind'], dicts['ind2c'], dicts['c2ind']
-    instances = []
-    num_labels = len(dicts['ind2c'])
-
-    wp_tokenizer = BertTokenizer.from_pretrained(args.bert_dir, do_lower_case=True)
-
-    with open(filename, 'r') as infile:
-        r = csv.reader(infile)
-        #header
-        next(r)
-
-        for row in r:
-
-            text = row[2]
-
-            labels_idx = np.zeros(num_labels)
-            labelled = False
-
-            for l in row[3].split(';'):
-                if l in c2ind.keys():
-                    code = int(c2ind[l])
-                    labels_idx[code] = 1
-                    labelled = True
-            if not labelled:
-                continue
-
-            tokens_ = text.split()
-            tokens = []
-            for token in tokens_:
-                if token == '[CLS]' or token == '[SEP]':
-                    continue
-                wps = wp_tokenizer.tokenize(token)
-                tokens.extend(wps)
-
-            tokens_max_len = max_length-2 # for CLS SEP
-            if len(tokens) > tokens_max_len:
-                tokens = tokens[:tokens_max_len]
-
-            tokens.insert(0, '[CLS]')
-            tokens.append('[SEP]')
-
-            tokens_id = wp_tokenizer.convert_tokens_to_ids(tokens)
-            masks = [1] * len(tokens)
-            segments = [0] * len(tokens)
-
-            dict_instance = {'label':labels_idx, 'tokens':tokens,
-                             "tokens_id":tokens_id, "segments":segments, "masks":masks}
-
-            instances.append(dict_instance)
-
-    return instances
+# def prepare_instance_bert(dicts, filename, args, max_length):
+#     ind2w, w2ind, ind2c, c2ind = dicts['ind2w'], dicts['w2ind'], dicts['ind2c'], dicts['c2ind']
+#     instances = []
+#     num_labels = len(dicts['ind2c'])
+#
+#     # wp_tokenizer = BertTokenizer.from_pretrained(args.bert_dir, do_lower_case=True)
+#
+#     with open(filename, 'r') as infile:
+#         r = csv.reader(infile)
+#         #header
+#         next(r)
+#
+#         for row in r:
+#
+#             text = row[2]
+#
+#             labels_idx = np.zeros(num_labels)
+#             labelled = False
+#
+#             for l in row[3].split(';'):
+#                 if l in c2ind.keys():
+#                     code = int(c2ind[l])
+#                     labels_idx[code] = 1
+#                     labelled = True
+#             if not labelled:
+#                 continue
+#
+#             tokens_ = text.split()
+#             tokens = []
+#             for token in tokens_:
+#                 if token == '[CLS]' or token == '[SEP]':
+#                     continue
+#                 wps = wp_tokenizer.tokenize(token)
+#                 tokens.extend(wps)
+#
+#             tokens_max_len = max_length-2 # for CLS SEP
+#             if len(tokens) > tokens_max_len:
+#                 tokens = tokens[:tokens_max_len]
+#
+#             tokens.insert(0, '[CLS]')
+#             tokens.append('[SEP]')
+#
+#             tokens_id = wp_tokenizer.convert_tokens_to_ids(tokens)
+#             masks = [1] * len(tokens)
+#             segments = [0] * len(tokens)
+#
+#             dict_instance = {'label':labels_idx, 'tokens':tokens,
+#                              "tokens_id":tokens_id, "segments":segments, "masks":masks}
+#
+#             instances.append(dict_instance)
+#
+#     return instances
 
 from torch.utils.data import Dataset
 class MyDataset(Dataset):
@@ -622,22 +631,22 @@ def my_collate(x):
 
     return inputs_id, labels, text_inputs
 
-def my_collate_bert(x):
-
-    words = [x_['tokens_id'] for x_ in x]
-    segments = [x_['segments'] for x_ in x]
-    masks = [x_['masks'] for x_ in x]
-
-    seq_len = [len(w) for w in words]
-    max_seq_len = max(seq_len)
-
-    inputs_id = pad_sequence(words, max_seq_len)
-    segments = pad_sequence(segments, max_seq_len)
-    masks = pad_sequence(masks, max_seq_len)
-
-    labels = [x_['label'] for x_ in x]
-
-    return inputs_id, segments, masks, labels
+# def my_collate_bert(x):
+#
+#     words = [x_['tokens_id'] for x_ in x]
+#     segments = [x_['segments'] for x_ in x]
+#     masks = [x_['masks'] for x_ in x]
+#
+#     seq_len = [len(w) for w in words]
+#     max_seq_len = max(seq_len)
+#
+#     inputs_id = pad_sequence(words, max_seq_len)
+#     segments = pad_sequence(segments, max_seq_len)
+#     masks = pad_sequence(masks, max_seq_len)
+#
+#     labels = [x_['label'] for x_ in x]
+#
+#     return inputs_id, segments, masks, labels
 
 
 def early_stop(metrics_hist, criterion, patience):
@@ -681,7 +690,6 @@ def save_everything(args, metrics_hist_all, model, model_dir, params, criterion,
     print("saved metrics, params, model to directory %s\n" % (model_dir))
 
 
-
 def print_metrics(metrics):
     print()
     if "auc_macro" in metrics.keys():
@@ -702,25 +710,31 @@ def print_metrics(metrics):
             print("%s: %.4f" % (metric, val))
     print()
 
+
 def union_size(yhat, y, axis):
     #axis=0 for label-level union (macro). axis=1 for instance-level
     return np.logical_or(yhat, y).sum(axis=axis).astype(float)
+
 
 def intersect_size(yhat, y, axis):
     #axis=0 for label-level union (macro). axis=1 for instance-level
     return np.logical_and(yhat, y).sum(axis=axis).astype(float)
 
+
 def macro_accuracy(yhat, y):
     num = intersect_size(yhat, y, 0) / (union_size(yhat, y, 0) + 1e-10)
     return np.mean(num)
+
 
 def macro_precision(yhat, y):
     num = intersect_size(yhat, y, 0) / (yhat.sum(axis=0) + 1e-10)
     return np.mean(num)
 
+
 def macro_recall(yhat, y):
     num = intersect_size(yhat, y, 0) / (y.sum(axis=0) + 1e-10)
     return np.mean(num)
+
 
 def macro_f1(yhat, y):
     prec = macro_precision(yhat, y)
@@ -735,14 +749,18 @@ def macro_f1(yhat, y):
 def all_macro(yhat, y):
     return macro_accuracy(yhat, y), macro_precision(yhat, y), macro_recall(yhat, y), macro_f1(yhat, y)
 
+
 def micro_accuracy(yhatmic, ymic):
     return intersect_size(yhatmic, ymic, 0) / union_size(yhatmic, ymic, 0)
+
 
 def micro_precision(yhatmic, ymic):
     return intersect_size(yhatmic, ymic, 0) / yhatmic.sum(axis=0)
 
+
 def micro_recall(yhatmic, ymic):
     return intersect_size(yhatmic, ymic, 0) / ymic.sum(axis=0)
+
 
 def micro_f1(yhatmic, ymic):
     prec = micro_precision(yhatmic, ymic)
@@ -753,8 +771,10 @@ def micro_f1(yhatmic, ymic):
         f1 = 2*(prec*rec)/(prec+rec)
     return f1
 
+
 def all_micro(yhatmic, ymic):
     return micro_accuracy(yhatmic, ymic), micro_precision(yhatmic, ymic), micro_recall(yhatmic, ymic), micro_f1(yhatmic, ymic)
+
 
 from sklearn.metrics import roc_curve, auc
 def auc_metrics(yhat_raw, y, ymic):
@@ -789,6 +809,7 @@ def auc_metrics(yhat_raw, y, ymic):
 
     return roc_auc
 
+
 def recall_at_k(yhat_raw, y, k):
     #num true labels in top k predictions / num true labels
     sortd = np.argsort(yhat_raw)[:,::-1]
@@ -806,6 +827,7 @@ def recall_at_k(yhat_raw, y, k):
 
     return np.mean(vals)
 
+
 def precision_at_k(yhat_raw, y, k):
     #num true labels in top k predictions / k
     sortd = np.argsort(yhat_raw)[:,::-1]
@@ -820,6 +842,7 @@ def precision_at_k(yhat_raw, y, k):
             vals.append(num_true_in_top_k / float(denom))
 
     return np.mean(vals)
+
 
 def all_metrics(yhat, y, k=8, yhat_raw=None, calc_auc=True):
     """
@@ -899,11 +922,13 @@ def _readString(f, code):
 
     return s
 
+
 import struct
 def _readFloat(f):
     bytes4 = f.read(4)
     f_num = struct.unpack('f', bytes4)[0]
     return f_num
+
 
 def load_pretrain_emb(embedding_path):
     embedd_dim = -1
@@ -952,9 +977,11 @@ def load_pretrain_emb(embedding_path):
 
     return embedd_dict, embedd_dim
 
+
 def norm2one(vec):
     root_sum_square = np.sqrt(np.sum(np.square(vec)))
     return vec/root_sum_square
+
 
 def build_pretrain_embedding(embedding_path, word_alphabet, norm):
 

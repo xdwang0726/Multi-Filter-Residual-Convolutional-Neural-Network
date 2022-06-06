@@ -5,8 +5,7 @@ import numpy as np
 import torch
 import csv
 import sys
-from utils import load_lookups, prepare_instance, prepare_instance_bert, MyDataset, my_collate, my_collate_bert, \
-    early_stop, save_everything
+from utils import load_lookups, prepare_instance, MyDataset, my_collate, my_collate_bert, early_stop, save_everything
 from models import pick_model
 import torch.optim as optim
 from collections import defaultdict
@@ -49,22 +48,24 @@ if __name__ == "__main__":
     metrics_hist_tr = defaultdict(lambda: [])
 
     if args.model.find("bert") != -1:
-        prepare_instance_func = prepare_instance_bert
+        print('True')
+        # prepare_instance_func = prepare_instance_bert
     else:
         prepare_instance_func = prepare_instance
 
     train_instances = prepare_instance_func(dicts, args.data_path, args, args.MAX_LENGTH)
     print("train_instances {}".format(len(train_instances)))
     if args.version != 'mimic2':
-        dev_instances = prepare_instance_func(dicts, args.data_path.replace('train','dev'), args, args.MAX_LENGTH)
+        dev_instances = prepare_instance_func(dicts, args.data_path.replace('train', 'dev'), args, args.MAX_LENGTH)
         print("dev_instances {}".format(len(dev_instances)))
     else:
         dev_instances = None
-    test_instances = prepare_instance_func(dicts, args.data_path.replace('train','test'), args, args.MAX_LENGTH)
+    test_instances = prepare_instance_func(dicts, args.data_path.replace('train', 'test'), args, args.MAX_LENGTH)
     print("test_instances {}".format(len(test_instances)))
 
     if args.model.find("bert") != -1:
-        collate_func = my_collate_bert
+        print('True')
+        # collate_func = my_collate_bert
     else:
         collate_func = my_collate
 
