@@ -402,7 +402,7 @@ class MultiResCNN_GCN(nn.Module):
 
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
-        self.U = nn.Linear(args.embedding_size, args.num_filter_maps * self.filter_num)
+        self.U = nn.Linear((args.embedding_size+args.num_filter_maps), args.num_filter_maps * self.filter_num)
         nn.init.xavier_uniform_(self.U.weight)
 
         # label graph
@@ -430,10 +430,9 @@ class MultiResCNN_GCN(nn.Module):
             tmp = tmp.transpose(1, 2)
             atten = torch.softmax(torch.matmul(tmp, label_feature.transpose(0, 1)), dim=1)
             atten_mask = atten * mask.unsqueeze(1)
-            atten_tmp = torch.matmul(tmp.transpose(1, 2), atten_mask).transpose(1, 2)  # size: (bs, num_label, embed_dim)
+            atten_tmp = torch.matmul(tmp.transpose(1, 2), atten_mask).transpose(1, 2)
             conv_result.append(atten_tmp)
-        x = torch.cat(conv_result, dim=2)  # size: (bs, seq_len-ksz+1, 50 * len(ksz_list)
-        print('x_dim', x.size())
+        x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 50 * len(ksz_list)
 
         new_label = self.U(new_label)
         print('new_label', new_label.size())
