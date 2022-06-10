@@ -448,7 +448,7 @@ class MultiResCNN_GCN(nn.Module):
             p.requires_grad = False
 
 
-def pick_model(args, dicts):
+def pick_model(args, dicts, num_class):
     Y = len(dicts['ind2c'])
     if args.model == 'CNN':
         model = CNN(args, Y, dicts)
@@ -458,6 +458,8 @@ def pick_model(args, dicts):
         model = ResCNN(args, Y, dicts)
     elif args.model == 'MultiResCNN':
         model = MultiResCNN(args, Y, dicts)
+    elif args.model == 'MultiSeResCNN_GCN':
+        model = MultiResCNN_GCN(args, Y, dicts, num_class)
     else:
         raise RuntimeError("wrong model name")
 

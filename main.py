@@ -51,7 +51,7 @@ if __name__ == "__main__":
     print("loading lookups...")
     dicts = load_lookups(args)
 
-    model = pick_model(args, dicts)
+    model = pick_model(args, dicts, num_nodes)
     print(model)
 
     if not args.test_model:

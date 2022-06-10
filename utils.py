@@ -495,7 +495,8 @@ def load_lookups(args):
 
 
 def prepare_instance(dicts, filename, args, max_length):
-    ind2w, w2ind, ind2c, c2ind = dicts['ind2w'], dicts['w2ind'], dicts['ind2c'], dicts['c2ind']
+    # ind2w, w2ind, ind2c, c2ind = dicts['ind2w'], dicts['w2ind'], dicts['ind2c'], dicts['c2ind']
+    ind2w, w2ind = dicts['ind2w'], dicts['w2ind']
     instances = []
     num_labels = len(dicts['ind2c'])
 
