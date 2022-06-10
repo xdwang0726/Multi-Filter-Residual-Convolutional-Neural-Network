@@ -411,6 +411,8 @@ class MultiResCNN_GCN(nn.Module):
         # corNet
         self.cornet = CorNet(num_class, cornet_dim, n_cornet_blocks)
 
+        self.loss_function = nn.BCEWithLogitsLoss()
+
     def forward(self, x, target, mask, g, g_node_feature):
 
         label_feature = self.gcn(g, g_node_feature) # size: (bs, num_label, 50)
