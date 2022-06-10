@@ -379,7 +379,7 @@ class MultiResCNN(nn.Module):
 
 class MultiResCNN_GCN(nn.Module):
     def __init__(self, args, Y, dicts, num_class, cornet_dim=1000, n_cornet_blocks=2):
-        super(MultiResCNN, self).__init__()
+        super(MultiResCNN_GCN, self).__init__()
 
         self.word_rep = WordRep(args, Y, dicts)
 
