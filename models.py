@@ -433,7 +433,7 @@ class MultiResCNN_GCN(nn.Module):
             atten_tmp = torch.matmul(tmp.transpose(1, 2), atten_mask).transpose(1, 2)  # size: (bs, num_label, embed_dim)
             conv_result.append(atten_tmp)
         x = torch.cat(conv_result, dim=2)  # size: (bs, seq_len-ksz+1, 50 * len(ksz_list)
-        print('x dim', x.shape())
+        print('x_dim', x.size())
 
         new_label = self.U(new_label)
         print('new_label', new_label.size())
