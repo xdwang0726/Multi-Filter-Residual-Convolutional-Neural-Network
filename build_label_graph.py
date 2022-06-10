@@ -131,7 +131,7 @@ def cooccurence_node_edge(train_data_path, id_pair_file, threshold, vectors):
         key = [k.lower() for k in key]
         key_embedding = torch.zeros(0)
         for k in key:
-            embedding = vectors.__getitem__(k).reshape(1, 200)
+            embedding = vectors.__getitem__(k).reshape(1, 100)
             key_embedding = torch.cat((key_embedding, embedding), dim=0)
         key_embedding = torch.mean(input=key_embedding, dim=0, keepdim=True)
         label_embedding = torch.cat((label_embedding, key_embedding), dim=0)

@@ -49,6 +49,7 @@ def train(args, model, optimizer, epoch, gpu, data_loader):
 
     return losses
 
+
 def test(args, model, data_path, fold, gpu, dicts, data_loader):
 
     filename = data_path.replace('train', fold)
@@ -102,7 +103,7 @@ def test(args, model, data_path, fold, gpu, dicts, data_loader):
     yhat = np.concatenate(yhat, axis=0)
     yhat_raw = np.concatenate(yhat_raw, axis=0)
 
-    k = 5 if num_labels == 50 else [8,15]
+    k = 5 if num_labels == 50 else [8, 15]
     metrics = all_metrics(yhat, y, k=k, yhat_raw=yhat_raw)
     print_metrics(metrics)
     metrics['loss_%s' % fold] = np.mean(losses)

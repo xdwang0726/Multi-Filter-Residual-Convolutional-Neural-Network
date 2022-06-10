@@ -468,6 +468,7 @@ def load_full_codes(train_path, mimic2_dir, version='mimic3'):
                         codes.add(code)
         codes = set([c for c in codes if c != ''])
         ind2c = defaultdict(str, {i:c for i,c in enumerate(sorted(codes))})
+        print('number of codes', len(list(ind2c.keys())))
     return ind2c
 
 
@@ -518,6 +519,16 @@ def prepare_instance(dicts, filename, args, max_length):
             if not labelled:
                 continue
 
+            mask_idx = np.zeros(num_labels)
+            masked = False
+            for m in row[4].split(';'):
+                if m in c2ind.keys():
+                    code = int(c2ind[l])
+                    mask_idx[code] = 1
+                    masked = True
+            if not masked:
+                continue
+
             tokens_ = text.split()
             tokens = []
             tokens_id = []
@@ -532,66 +543,13 @@ def prepare_instance(dicts, filename, args, max_length):
                 tokens = tokens[:max_length]
                 tokens_id = tokens_id[:max_length]
 
-            dict_instance = {'label': labels_idx, 'tokens': tokens, 'tokens_id': tokens_id}
+            dict_instance = {'label': labels_idx, 'tokens': tokens, 'tokens_id': tokens_id, 'mask': mask_idx}
+            print('sample instance', dict_instance)
 
             instances.append(dict_instance)
 
     return instances
 
-
-from pytorch_pretrained_bert import BertTokenizer
-# def prepare_instance_bert(dicts, filename, args, max_length):
-#     ind2w, w2ind, ind2c, c2ind = dicts['ind2w'], dicts['w2ind'], dicts['ind2c'], dicts['c2ind']
-#     instances = []
-#     num_labels = len(dicts['ind2c'])
-#
-#     # wp_tokenizer = BertTokenizer.from_pretrained(args.bert_dir, do_lower_case=True)
-#
-#     with open(filename, 'r') as infile:
-#         r = csv.reader(infile)
-#         #header
-#         next(r)
-#
-#         for row in r:
-#
-#             text = row[2]
-#
-#             labels_idx = np.zeros(num_labels)
-#             labelled = False
-#
-#             for l in row[3].split(';'):
-#                 if l in c2ind.keys():
-#                     code = int(c2ind[l])
-#                     labels_idx[code] = 1
-#                     labelled = True
-#             if not labelled:
-#                 continue
-#
-#             tokens_ = text.split()
-#             tokens = []
-#             for token in tokens_:
-#                 if token == '[CLS]' or token == '[SEP]':
-#                     continue
-#                 wps = wp_tokenizer.tokenize(token)
-#                 tokens.extend(wps)
-#
-#             tokens_max_len = max_length-2 # for CLS SEP
-#             if len(tokens) > tokens_max_len:
-#                 tokens = tokens[:tokens_max_len]
-#
-#             tokens.insert(0, '[CLS]')
-#             tokens.append('[SEP]')
-#
-#             tokens_id = wp_tokenizer.convert_tokens_to_ids(tokens)
-#             masks = [1] * len(tokens)
-#             segments = [0] * len(tokens)
-#
-#             dict_instance = {'label':labels_idx, 'tokens':tokens,
-#                              "tokens_id":tokens_id, "segments":segments, "masks":masks}
-#
-#             instances.append(dict_instance)
-#
-#     return instances
 
 from torch.utils.data import Dataset
 class MyDataset(Dataset):
@@ -599,12 +557,12 @@ class MyDataset(Dataset):
     def __init__(self, X):
         self.X = X
 
-
     def __len__(self):
         return len(self.X)
 
     def __getitem__(self, idx):
         return self.X[idx]
+
 
 def pad_sequence(x, max_len, type=np.int):
 
@@ -614,7 +572,7 @@ def pad_sequence(x, max_len, type=np.int):
 
     return padded_x
 
-# from elmo.elmo import batch_to_ids
+
 def my_collate(x):
 
     words = [x_['tokens_id'] for x_ in x]
@@ -631,23 +589,6 @@ def my_collate(x):
 
     # return inputs_id, labels, text_inputs
     return inputs_id, labels
-
-# def my_collate_bert(x):
-#
-#     words = [x_['tokens_id'] for x_ in x]
-#     segments = [x_['segments'] for x_ in x]
-#     masks = [x_['masks'] for x_ in x]
-#
-#     seq_len = [len(w) for w in words]
-#     max_seq_len = max(seq_len)
-#
-#     inputs_id = pad_sequence(words, max_seq_len)
-#     segments = pad_sequence(segments, max_seq_len)
-#     masks = pad_sequence(masks, max_seq_len)
-#
-#     labels = [x_['label'] for x_ in x]
-#
-#     return inputs_id, segments, masks, labels
 
 
 def early_stop(metrics_hist, criterion, patience):

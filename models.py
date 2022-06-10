@@ -1,12 +1,97 @@
+from math import floor
 
+import dgl.function as fn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.init import xavier_uniform_ as xavier_uniform
-# from elmo.elmo import Elmo
-import json
+
 from utils import build_pretrain_embedding, load_embeddings
-from math import floor
+
+gcn_msg = fn.copy_src(src='h', out='m')
+gcn_reduce = fn.sum(msg='m', out='h')
+
+
+class GCNLayer(nn.Module):
+    def __init__(self, in_feats, out_feats):
+        super(GCNLayer, self).__init__()
+        self.linear = nn.Linear(in_feats, out_feats)
+
+    def forward(self, g, feature):
+        """
+        inputs: g,       object of Graph
+                feature, node features
+        """
+        with g.local_scope():
+            g.ndata['h'] = feature
+            g.update_all(gcn_msg, gcn_reduce)
+            h = g.ndata['h']
+            return self.linear(h)
+
+
+class LabelNet(nn.Module):
+    def __init__(self, hidden_gcn_size, num_classes, in_node_features):
+        super(LabelNet, self).__init__()
+        self.gcn1 = GCNLayer(in_node_features, hidden_gcn_size)
+        self.gcn2 = GCNLayer(hidden_gcn_size, num_classes)
+
+    def forward(self, g, features):
+        x = self.gcn1(g, features)
+        x = F.relu(x)
+        x = self.gcn2(g, x)
+        return x
+
+
+class CorNetBlock(nn.Module):
+    def __init__(self, context_size, output_size):
+        super(CorNetBlock, self).__init__()
+        self.dstbn2cntxt = nn.Linear(output_size, context_size)
+        self.cntxt2dstbn = nn.Linear(context_size, output_size)
+        self.act_fn = torch.sigmoid
+
+    def forward(self, output_dstrbtn):
+        identity_logits = output_dstrbtn
+        output_dstrbtn = self.act_fn(output_dstrbtn)
+        context_vector = self.dstbn2cntxt(output_dstrbtn)
+        context_vector = F.elu(context_vector)
+        output_dstrbtn = self.cntxt2dstbn(context_vector)
+        output_dstrbtn = output_dstrbtn + identity_logits
+        return output_dstrbtn
+
+
+class CorNet(nn.Module):
+    def __init__(self, output_size, cornet_dim=1000, n_cornet_blocks=2):
+        super(CorNet, self).__init__()
+        self.intlv_layers = nn.ModuleList(
+            [CorNetBlock(cornet_dim, output_size) for _ in range(n_cornet_blocks)])
+        for layer in self.intlv_layers:
+            nn.init.xavier_uniform_(layer.dstbn2cntxt.weight)
+            nn.init.xavier_uniform_(layer.cntxt2dstbn.weight)
+
+    def forward(self, logits):
+        for layer in self.intlv_layers:
+            logits = layer(logits)
+        return logits
+
+
+class SE_Block(nn.Module):
+    "credits: https://github.com/moskomule/senet.pytorch/blob/master/senet/se_module.py#L4"
+    def __init__(self, c, r=20):
+        super().__init__()
+        self.squeeze = nn.AdaptiveAvgPool1d(1)
+        self.excitation = nn.Sequential(
+            nn.Linear(c, c // r, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(c // r, c, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        bs, c, _ = x.shape
+        y = self.squeeze(x).view(bs, c)
+        y = self.excitation(y).view(bs, c, 1)
+        return x * y.expand_as(x)
+
 
 class WordRep(nn.Module):
     def __init__(self, args, Y, dicts):
@@ -61,6 +146,7 @@ class WordRep(nn.Module):
         x = self.embed_drop(x)
         return x
 
+
 class OutputLayer(nn.Module):
     def __init__(self, args, Y, dicts, input_size):
         super(OutputLayer, self).__init__()
@@ -73,7 +159,6 @@ class OutputLayer(nn.Module):
         xavier_uniform(self.final.weight)
 
         self.loss_function = nn.BCEWithLogitsLoss()
-
 
 
     def forward(self, x, target):
@@ -180,7 +265,7 @@ class ResidualBlock(nn.Module):
             nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(kernel_size / 2)), bias=False),
             nn.BatchNorm1d(outchannel)
         )
-
+        self.se = SE_Block(outchannel)
         self.use_res = use_res
         if self.use_res:
             self.shortcut = nn.Sequential(
@@ -192,11 +277,13 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         out = self.left(x)
+        out = self.se(out)
         if self.use_res:
             out += self.shortcut(x)
         out = torch.tanh(out)
         out = self.dropout(out)
         return out
+
 
 class ResCNN(nn.Module):
 
@@ -256,12 +343,11 @@ class MultiResCNN(nn.Module):
             for idx in range(args.conv_layer):
                 tmp = ResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], filter_size, 1, True,
                                     args.dropout)
-                one_channel.add_module('resconv-{}'.format(idx), tmp)
+                one_channel.add_module('se-resconv-{}'.format(idx), tmp)
 
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
-
 
     def forward(self, x, target):
 
@@ -290,46 +376,75 @@ class MultiResCNN(nn.Module):
         for p in self.word_rep.embed.parameters():
             p.requires_grad = False
 
-import os
-from pytorch_pretrained_bert.modeling import BertLayerNorm
-from pytorch_pretrained_bert import BertModel, BertConfig
-class Bert_seq_cls(nn.Module):
 
-    def __init__(self, args, Y):
-        super(Bert_seq_cls, self).__init__()
+class MultiResCNN_GCN(nn.Module):
+    def __init__(self, args, Y, dicts, num_class, cornet_dim=1000, n_cornet_blocks=2):
+        super(MultiResCNN, self).__init__()
 
-        print("loading pretrained bert from {}".format(args.bert_dir))
-        config_file = os.path.join(args.bert_dir, 'bert_config.json')
-        self.config = BertConfig.from_json_file(config_file)
-        print("Model config {}".format(self.config))
-        self.bert = BertModel.from_pretrained(args.bert_dir)
+        self.word_rep = WordRep(args, Y, dicts)
 
-        self.dim_reduction = nn.Linear(self.config.hidden_size, args.num_filter_maps)
-        self.dropout = nn.Dropout(self.config.hidden_dropout_prob)
-        self.classifier = nn.Linear(args.num_filter_maps, Y)
-        self.apply(self.init_bert_weights)
+        self.conv = nn.ModuleList()
+        filter_sizes = args.filter_size.split(',')
 
-    def forward(self, input_ids, token_type_ids, attention_mask, target):
-        _, pooled_output = self.bert(input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False)
-        x = self.dim_reduction(pooled_output)
-        x = self.dropout(x)
-        y = self.classifier(x)
+        self.filter_num = len(filter_sizes)
+        for filter_size in filter_sizes:
+            filter_size = int(filter_size)
+            one_channel = nn.ModuleList()
+            tmp = nn.Conv1d(self.word_rep.feature_size, self.word_rep.feature_size, kernel_size=filter_size,
+                            padding=int(floor(filter_size / 2)))
+            xavier_uniform(tmp.weight)
+            one_channel.add_module('baseconv', tmp)
 
-        loss = F.binary_cross_entropy_with_logits(y, target)
+            conv_dimension = self.word_rep.conv_dict[args.conv_layer]
+            for idx in range(args.conv_layer):
+                tmp = ResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], filter_size, 1, True, args.dropout)
+                one_channel.add_module('resconv-{}'.format(idx), tmp)
+
+            self.conv.add_module('channel-{}'.format(filter_size), one_channel)
+
+        self.U = nn.Linear(100, self.num_filter_maps * self.filter_num)
+        nn.init.xavier_uniform_(self.U.weight)
+
+        # label graph
+        self.gcn = LabelNet(100, 50, 100)
+
+        # corNet
+        self.cornet = CorNet(num_class, cornet_dim, n_cornet_blocks)
+
+    def forward(self, x, target, mask, g, g_node_feature):
+
+        label_feature = self.gcn(g, g_node_feature) # size: (bs, num_label, 50)
+        new_label = torch.cat((label_feature, g_node_feature), dim=1)
+
+        x = self.word_rep(x, target)
+        x = x.transpose(1, 2)
+
+        conv_result = []
+        for conv in self.conv:
+            tmp = x
+            for idx, md in enumerate(conv):
+                if idx == 0:
+                    tmp = torch.tanh(md(tmp))
+                else:
+                    tmp = md(tmp)
+            tmp = tmp.transpose(1, 2)
+            atten = torch.softmax(torch.matmul(tmp, label_feature.transpose(0, 1), dim=1))
+            atten_mask = atten * mask.unsqueeze(1)
+            atten_tmp = torch.matmul(tmp.transpose(1, 2), atten_mask).transpose(1, 2)  # size: (bs, num_label, embed_dim)
+            conv_result.append(atten_tmp)
+        x = torch.cat(conv_result, dim=2)  # size: (bs, seq_len-ksz+1, 50 * len(ksz_list)
+        print('x dim', x.shape())
+
+        new_label = self.U(new_label)
+        feature = torch.sum(x * new_label, dim=2)
+        y = self.cornet(feature)
+        loss = self.loss_function(y, target)
+
         return y, loss
 
-    def init_bert_weights(self, module):
-
-        if isinstance(module, (nn.Linear, nn.Embedding)):
-            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
-        elif isinstance(module, BertLayerNorm):
-            module.bias.data.zero_()
-            module.weight.data.fill_(1.0)
-        if isinstance(module, nn.Linear) and module.bias is not None:
-            module.bias.data.zero_()
-
     def freeze_net(self):
-        pass
+        for p in self.word_rep.embed.parameters():
+            p.requires_grad = False
 
 
 def pick_model(args, dicts):
@@ -342,8 +457,6 @@ def pick_model(args, dicts):
         model = ResCNN(args, Y, dicts)
     elif args.model == 'MultiResCNN':
         model = MultiResCNN(args, Y, dicts)
-    elif args.model == 'bert_seq_cls':
-        model = Bert_seq_cls(args, Y)
     else:
         raise RuntimeError("wrong model name")
 

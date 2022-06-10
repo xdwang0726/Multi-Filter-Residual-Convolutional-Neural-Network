@@ -13,8 +13,8 @@ Y = 'full'
 notes_file = '%s/NOTEEVENTS.csv' % args.MIMIC_3_DIR
 
 # step 1: process code-related files
-dfproc = pd.read_csv('%s/PROCEDURES_ICD.csv' % args.MIMIC_3_DIR)
-dfdiag = pd.read_csv('%s/DIAGNOSES_ICD.csv' % args.MIMIC_3_DIR)
+dfproc = pd.read_csv('%s/PROCEDURES_ICD.csv' % args.MIMIC_3_DIR, dtype={'ICD9_CODE': str})
+dfdiag = pd.read_csv('%s/DIAGNOSES_ICD.csv' % args.MIMIC_3_DIR, dtype={'ICD9_CODE': str})
 
 dfdiag['absolute_code'] = dfdiag.apply(lambda row: str(reformat(str(row[4]), True)), axis=1)
 dfproc['absolute_code'] = dfproc.apply(lambda row: str(reformat(str(row[4]), False)), axis=1)
@@ -54,7 +54,7 @@ with open('%s/ALL_CODES.csv' % args.MIMIC_3_DIR, 'r') as lf:
             if hadm_id in hadm_ids:
                 w.writerow(row[1:3] + [row[-1], '', ''])
 
-dfl = pd.read_csv('%s/ALL_CODES_filtered.csv' % args.MIMIC_3_DIR, index_col=None)
+dfl = pd.read_csv('%s/ALL_CODES_filtered.csv' % args.MIMIC_3_DIR, index_col=None, dtype={'ICD9_CODE': str})
 
 dfl = dfl.sort_values(['SUBJECT_ID', 'HADM_ID'])
 dfl.to_csv('%s/ALL_CODES_filtered.csv' % args.MIMIC_3_DIR, index=False)
