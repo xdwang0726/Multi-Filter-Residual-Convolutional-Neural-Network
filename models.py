@@ -428,7 +428,7 @@ class MultiResCNN_GCN(nn.Module):
                 else:
                     tmp = md(tmp)
             tmp = tmp.transpose(1, 2)
-            atten = torch.softmax(torch.matmul(tmp, label_feature.transpose(0, 1), dim=1))
+            atten = torch.softmax(torch.matmul(tmp, label_feature.transpose(0, 1)), dim=1)
             atten_mask = atten * mask.unsqueeze(1)
             atten_tmp = torch.matmul(tmp.transpose(1, 2), atten_mask).transpose(1, 2)  # size: (bs, num_label, embed_dim)
             conv_result.append(atten_tmp)
