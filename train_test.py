@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from utils import all_metrics, print_metrics
 
-def train(args, model, optimizer, epoch, gpu, data_loader):
+def train(args, mlb, model, optimizer, epoch, gpu, data_loader, G):
 
     print("EPOCH %d" % epoch)
 
@@ -31,15 +31,18 @@ def train(args, model, optimizer, epoch, gpu, data_loader):
             output, loss = model(inputs_id, segments, masks, labels)
         else:
 
-            inputs_id, labels = next(data_iter)
+            inputs_id, labels, masks = next(data_iter)
 
-            inputs_id, labels = torch.LongTensor(inputs_id), torch.FloatTensor(labels)
+            inputs_id = torch.LongTensor(inputs_id)
+            labels = torch.from_numpy(mlb.fit_transform(labels)).type(torch.float)
+            masks = torch.from_numpy(mlb.fit_transform(masks)).type(torch.float)
 
             if gpu >= 0:
-                inputs_id, labels = inputs_id.cuda(gpu), labels.cuda(gpu)
+                inputs_id, labels, masks = inputs_id.cuda(gpu), labels.cuda(gpu), masks.cuda(gpu)
+                G, G.ndata['feat'] = G.to('cuda'), G.ndata['feat'].to('cuda')
 
             # output, loss = model(inputs_id, labels, text_inputs)
-            output, loss = model(inputs_id, labels)
+            output, loss = model(inputs_id, labels, masks, G, G.ndata['feat'])
 
         optimizer.zero_grad()
         loss.backward()
@@ -50,7 +53,7 @@ def train(args, model, optimizer, epoch, gpu, data_loader):
     return losses
 
 
-def test(args, model, data_path, fold, gpu, dicts, data_loader):
+def test(args, mlb, model, data_path, fold, gpu, dicts, data_loader, G):
 
     filename = data_path.replace('train', fold)
     print('file for evaluation: %s' % filename)
@@ -79,14 +82,17 @@ def test(args, model, data_path, fold, gpu, dicts, data_loader):
                 output, loss = model(inputs_id, segments, masks, labels)
             else:
 
-                inputs_id, labels = next(data_iter)
+                inputs_id, labels, masks = next(data_iter)
 
-                inputs_id, labels, = torch.LongTensor(inputs_id), torch.FloatTensor(labels)
+                inputs_id = torch.LongTensor(inputs_id)
+                labels = torch.from_numpy(mlb.fit_transform(labels)).type(torch.float)
+                masks = torch.from_numpy(mlb.fit_transform(masks)).type(torch.float)
 
                 if gpu >= 0:
-                    inputs_id, labels = inputs_id.cuda(gpu), labels.cuda(gpu)
+                    inputs_id, labels, masks = inputs_id.cuda(gpu), labels.cuda(gpu), masks.cuda(gpu)
+                    G, G.ndata['feat'] = G.to('cuda'), G.ndata['feat'].to('cuda')
 
-                output, loss = model(inputs_id, labels)
+                output, loss = model(inputs_id, labels, masks, G, G.ndata['feat'])
 
             output = torch.sigmoid(output)
             output = output.data.cpu().numpy()

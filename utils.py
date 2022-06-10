@@ -508,26 +508,29 @@ def prepare_instance(dicts, filename, args, max_length):
 
             text = row[2]
 
-            labels_idx = np.zeros(num_labels)
-            labelled = False
+            # labels_idx = np.zeros(num_labels)
+            # labelled = False
+            #
+            # for l in row[3].split(';'):
+            #     if l in c2ind.keys():
+            #         code = int(c2ind[l])
+            #         labels_idx[code] = 1
+            #         labelled = True
+            # if not labelled:
+            #     continue
+            #
+            # mask_idx = np.zeros(num_labels)
+            # masked = False
+            # for m in row[4].split(';'):
+            #     if m in c2ind.keys():
+            #         code = int(c2ind[l])
+            #         mask_idx[code] = 1
+            #         masked = True
+            # if not masked:
+            #     continue
 
-            for l in row[3].split(';'):
-                if l in c2ind.keys():
-                    code = int(c2ind[l])
-                    labels_idx[code] = 1
-                    labelled = True
-            if not labelled:
-                continue
-
-            mask_idx = np.zeros(num_labels)
-            masked = False
-            for m in row[4].split(';'):
-                if m in c2ind.keys():
-                    code = int(c2ind[l])
-                    mask_idx[code] = 1
-                    masked = True
-            if not masked:
-                continue
+            labels = str(row[3]).split(';')
+            masks = str(row[4]).split(';')
 
             tokens_ = text.split()
             tokens = []
@@ -543,8 +546,7 @@ def prepare_instance(dicts, filename, args, max_length):
                 tokens = tokens[:max_length]
                 tokens_id = tokens_id[:max_length]
 
-            dict_instance = {'label': labels_idx, 'tokens': tokens, 'tokens_id': tokens_id, 'mask': mask_idx}
-            print('sample instance', dict_instance)
+            dict_instance = {'label': labels, 'tokens': tokens, 'tokens_id': tokens_id, 'mask': masks}
 
             instances.append(dict_instance)
 
@@ -583,12 +585,13 @@ def my_collate(x):
     inputs_id = pad_sequence(words, max_seq_len)
 
     labels = [x_['label'] for x_ in x]
+    masks = [x_['mask'] for x_ in x]
 
     # text_inputs = [x_['tokens'] for x_ in x]
     # text_inputs = batch_to_ids(text_inputs)
 
     # return inputs_id, labels, text_inputs
-    return inputs_id, labels
+    return inputs_id, labels, masks
 
 
 def early_stop(metrics_hist, criterion, patience):

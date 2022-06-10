@@ -436,6 +436,7 @@ class MultiResCNN_GCN(nn.Module):
         print('x dim', x.shape())
 
         new_label = self.U(new_label)
+        print('new_label', new_label.size())
         feature = torch.sum(x * new_label, dim=2)
         y = self.cornet(feature)
         loss = self.loss_function(y, target)

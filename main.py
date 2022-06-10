@@ -1,19 +1,22 @@
-
-from options import args
+import csv
+import os
 import random
+import sys
+import time
+from collections import defaultdict
+
+import dgl
 import numpy as np
 import torch
-import csv
-import sys
-from utils import load_lookups, prepare_instance, MyDataset, my_collate, early_stop, save_everything
-from models import pick_model
 import torch.optim as optim
-from collections import defaultdict
-from torch.utils.data import DataLoader
-import os
-import time
-from train_test import train, test
 from pytorch_pretrained_bert import BertAdam
+from sklearn.preprocessing import MultiLabelBinarizer
+from torch.utils.data import DataLoader
+
+from models import pick_model
+from options import args
+from train_test import train, test
+from utils import load_lookups, prepare_instance, MyDataset, my_collate, early_stop, save_everything
 
 if __name__ == "__main__":
 
@@ -25,6 +28,22 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(args.random_seed)
 
     print(args)
+
+    mapping_id = {}
+    with open(args.icd_name_pair, 'r') as f:
+        for line in f:
+            (key, value) = line.split('\t')
+            mapping_id[key] = value.strip()
+
+    meshIDs = list(mapping_id.keys())
+    print('Total number of labels %d' % len(meshIDs))
+    mlb = MultiLabelBinarizer(classes=meshIDs)
+    mlb.fit(meshIDs)
+    num_nodes = len(meshIDs)
+
+    print('Load graph')
+    G = dgl.load_graphs(args.graph)[0][0]
+    print('graph', G.ndata['feat'].shape)
 
     csv.field_size_limit(sys.maxsize)
 
@@ -106,7 +125,7 @@ if __name__ == "__main__":
 
         if not test_only:
             epoch_start = time.time()
-            losses = train(args, model, optimizer, epoch, args.gpu, train_loader)
+            losses = train(args, mlb, model, optimizer, epoch, args.gpu, train_loader, G)
             loss = np.mean(losses)
             epoch_finish = time.time()
             print("epoch finish in %.2fs, loss: %.4f" % (epoch_finish - epoch_start, loss))
@@ -122,11 +141,11 @@ if __name__ == "__main__":
 
         # test on dev
         evaluation_start = time.time()
-        metrics = test(args, model, args.data_path, fold, args.gpu, dicts, dev_loader)
+        metrics = test(args, mlb, model, args.data_path, fold, args.gpu, dicts, dev_loader, G)
         evaluation_finish = time.time()
         print("evaluation finish in %.2fs" % (evaluation_finish - evaluation_start))
         if test_only or epoch == args.n_epochs - 1:
-            metrics_te = test(args, model, args.data_path, "test", args.gpu, dicts, test_loader)
+            metrics_te = test(args, mlb, model, args.data_path, "test", args.gpu, dicts, test_loader,G)
         else:
             metrics_te = defaultdict(float)
         metrics_tr = {'loss': loss}
