@@ -402,11 +402,11 @@ class MultiResCNN_GCN(nn.Module):
 
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
-        self.U = nn.Linear(100, self.num_filter_maps * self.filter_num)
+        self.U = nn.Linear(args.embedding_size, args.num_filter_maps * self.filter_num)
         nn.init.xavier_uniform_(self.U.weight)
 
         # label graph
-        self.gcn = LabelNet(100, 50, 100)
+        self.gcn = LabelNet(args.embedding_size, args.num_filter_maps, args.embedding_size)
 
         # corNet
         self.cornet = CorNet(num_class, cornet_dim, n_cornet_blocks)
