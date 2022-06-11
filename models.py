@@ -158,7 +158,7 @@ class OutputLayer(nn.Module):
         self.final = nn.Linear(input_size, Y)
         xavier_uniform(self.final.weight)
 
-        self.loss_function = nn.BCEWithLogitsLoss()
+        # self.loss_function = nn.BCEWithLogitsLoss()
 
 
     def forward(self, x, target):
@@ -169,9 +169,9 @@ class OutputLayer(nn.Module):
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
 
-        loss = self.loss_function(y, target)
-        return y, loss
-
+        # loss = self.loss_function(y, target)
+        # return y, loss
+        return y
 
 class CNN(nn.Module):
     def __init__(self, args, Y, dicts):
@@ -402,8 +402,8 @@ class MultiResCNN_GCN(nn.Module):
 
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
-        self.U = nn.Linear((args.embedding_size+args.num_filter_maps), args.num_filter_maps * self.filter_num)
-        nn.init.xavier_uniform_(self.U.weight)
+        # self.U = nn.Linear((args.embedding_size+args.num_filter_maps), args.num_filter_maps * self.filter_num)
+        # nn.init.xavier_uniform_(self.U.weight)
 
         # label graph
         self.gcn = LabelNet(args.embedding_size, args.num_filter_maps, args.embedding_size)
@@ -411,6 +411,9 @@ class MultiResCNN_GCN(nn.Module):
         # corNet
         self.cornet = CorNet(num_class, cornet_dim, n_cornet_blocks)
 
+        self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
+
+        # loss
         self.loss_function = nn.BCEWithLogitsLoss()
 
     def forward(self, x, target, mask, g, g_node_feature):
@@ -434,11 +437,14 @@ class MultiResCNN_GCN(nn.Module):
             atten_mask = atten * mask.unsqueeze(1)
             atten_tmp = torch.matmul(tmp.transpose(1, 2), atten_mask).transpose(1, 2)
             conv_result.append(atten_tmp)
-        x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 50 * len(ksz_list)
+        x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 50 * len(ksz_list))
 
-        new_label = self.U(new_label)
-        feature = torch.sum(x * new_label, dim=2)
-        y = self.cornet(feature)
+        # new_label = self.U(new_label)
+        # feature = torch.sum(x * new_label, dim=2)
+        # y = self.cornet(feature)
+        #
+        y = self.output_layer(x, target)
+        y = self.cornet(y)
         loss = self.loss_function(y, target)
 
         return y, loss
