@@ -154,12 +154,10 @@ class OutputLayer(nn.Module):
         self.U = nn.Linear(input_size, Y)
         xavier_uniform(self.U.weight)
 
-
         self.final = nn.Linear(input_size, Y)
         xavier_uniform(self.final.weight)
 
         # self.loss_function = nn.BCEWithLogitsLoss()
-
 
     def forward(self, x, target):
 
@@ -172,6 +170,7 @@ class OutputLayer(nn.Module):
         # loss = self.loss_function(y, target)
         # return y, loss
         return y
+
 
 class CNN(nn.Module):
     def __init__(self, args, Y, dicts):
@@ -229,8 +228,6 @@ class MultiCNN(nn.Module):
                 self.conv.add_module('conv-{}'.format(filter_size), tmp)
 
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
-
-
 
     def forward(self, x, target, text_inputs):
 
@@ -299,7 +296,6 @@ class ResCNN(nn.Module):
             self.conv.add_module('conv-{}'.format(idx), tmp)
 
         self.output_layer = OutputLayer(args, Y, dicts, args.num_filter_maps)
-
 
     def forward(self, x, target, text_inputs):
 
@@ -411,7 +407,7 @@ class MultiResCNN_GCN(nn.Module):
         # corNet
         self.cornet = CorNet(num_class, cornet_dim, n_cornet_blocks)
 
-        self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
+        self.output_layer = OutputLayer(args, num_class, dicts, self.filter_num * args.num_filter_maps)
 
         # loss
         self.loss_function = nn.BCEWithLogitsLoss()
@@ -419,7 +415,6 @@ class MultiResCNN_GCN(nn.Module):
     def forward(self, x, target, mask, g, g_node_feature):
 
         label_feature = self.gcn(g, g_node_feature) # size: (bs, num_label, 50)
-        new_label = torch.cat((label_feature, g_node_feature), dim=1)
 
         x = self.word_rep(x, target)
         x = x.transpose(1, 2)
