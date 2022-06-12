@@ -415,6 +415,7 @@ class MultiResCNN_GCN(nn.Module):
         label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
 
         atten_mask = g_node_feature.transpose(0, 1) * mask.unsqueeze(1)
+        print('mask', atten_mask.size())
 
         x = self.word_rep(x, target)
         x = x.transpose(1, 2)
@@ -434,6 +435,7 @@ class MultiResCNN_GCN(nn.Module):
         x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 100 * len(ksz_list))
 
         x = self.U(x)
+        print('x', x.size())
         atten = torch.softmax(torch.matmul(x, atten_mask), dim=1)
         atten_x = torch.matmul(x.transpose(1, 2), atten).transpose(1, 2)
 
