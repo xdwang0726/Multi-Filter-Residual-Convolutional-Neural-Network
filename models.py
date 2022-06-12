@@ -156,7 +156,7 @@ class OutputLayer(nn.Module):
         self.final = nn.Linear(input_size, Y)
         xavier_uniform(self.final.weight)
 
-        self.loss_function = nn.BCEWithLogitsLoss()
+        # self.loss_function = nn.BCEWithLogitsLoss()
 
     def forward(self, x, target):
 
@@ -166,9 +166,9 @@ class OutputLayer(nn.Module):
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
 
-        loss = self.loss_function(y, target)
-        return y, loss
-        # return y
+        # loss = self.loss_function(y, target)
+        # return y, loss
+        return y
 
 
 class CNN(nn.Module):
@@ -411,7 +411,10 @@ class MultiResCNN_GCN(nn.Module):
 
     def forward(self, x, target, mask, g, g_node_feature):
 
-        label_feature = self.gcn(g, g_node_feature) # size: (bs, num_label, 50)
+        label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
+        label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
+
+        atten_mask = g_node_feature.transpose(0, 1) * mask.unsqueeze(1)
 
         x = self.word_rep(x, target)
         x = x.transpose(1, 2)
@@ -425,11 +428,10 @@ class MultiResCNN_GCN(nn.Module):
                 else:
                     tmp = md(tmp)
             tmp = tmp.transpose(1, 2)
-            atten = torch.softmax(torch.matmul(tmp, label_feature.transpose(0, 1)), dim=1)
-            atten_mask = atten * mask.unsqueeze(1)
-            atten_tmp = torch.matmul(tmp.transpose(1, 2), atten_mask).transpose(1, 2)
+            atten = torch.softmax(torch.matmul(tmp, atten_mask), dim=1)
+            atten_tmp = torch.matmul(tmp.transpose(1, 2), atten).transpose(1, 2)
             conv_result.append(atten_tmp)
-        x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 50 * len(ksz_list))
+        x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 100 * len(ksz_list))
 
         # new_label = self.U(new_label)
         # feature = torch.sum(x * new_label, dim=2)
