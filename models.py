@@ -395,7 +395,7 @@ class MultiResCNN_GCN(nn.Module):
 
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
-        self.U = nn.Linear(self.num_filter_maps * len(self.ksz_list), args.embedding_size)
+        self.U = nn.Linear(args.num_filter_maps * self.filter_num, args.embedding_size)
         nn.init.xavier_uniform_(self.U.weight)
 
         # label graph
