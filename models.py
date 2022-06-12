@@ -395,8 +395,8 @@ class MultiResCNN_GCN(nn.Module):
 
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
-        # self.U = nn.Linear((args.embedding_size+args.num_filter_maps), args.num_filter_maps * self.filter_num)
-        # nn.init.xavier_uniform_(self.U.weight)
+        self.U = nn.Linear(self.num_filter_maps * len(self.ksz_list), args.embedding_size)
+        nn.init.xavier_uniform_(self.U.weight)
 
         # label graph
         self.gcn = LabelNet(args.embedding_size, args.num_filter_maps, args.embedding_size)
@@ -428,17 +428,20 @@ class MultiResCNN_GCN(nn.Module):
                 else:
                     tmp = md(tmp)
             tmp = tmp.transpose(1, 2)
-            atten = torch.softmax(torch.matmul(tmp, atten_mask), dim=1)
-            atten_tmp = torch.matmul(tmp.transpose(1, 2), atten).transpose(1, 2)
-            conv_result.append(atten_tmp)
+            # atten = torch.softmax(torch.matmul(tmp, atten_mask), dim=1)
+            # atten_tmp = torch.matmul(tmp.transpose(1, 2), atten).transpose(1, 2)
+            conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 100 * len(ksz_list))
 
-        # new_label = self.U(new_label)
-        # feature = torch.sum(x * new_label, dim=2)
-        # y = self.cornet(feature)
+        x = self.U(x)
+        atten = torch.softmax(torch.matmul(x, atten_mask), dim=1)
+        atten_x = torch.matmul(x.transpose(1, 2), atten).transpose(1, 2)
+
+        feature = torch.sum(atten_x * label_feature, dim=2)
+        y = self.cornet(feature)
         #
-        y = self.output_layer(x, target)
-        y = self.cornet(y)
+        # y = self.output_layer(x, target)
+        # y = self.cornet(y)
         loss = self.loss_function(y, target)
 
         return y, loss
