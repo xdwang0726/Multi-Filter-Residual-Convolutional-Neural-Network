@@ -131,7 +131,6 @@ class WordRep(nn.Module):
                      4: [self.feature_size, 200, 150, 100, args.num_filter_maps]
                      }
 
-
     def forward(self, x, target):
 
         features = [self.embed(x)]
@@ -157,7 +156,7 @@ class OutputLayer(nn.Module):
         self.final = nn.Linear(input_size, Y)
         xavier_uniform(self.final.weight)
 
-        # self.loss_function = nn.BCEWithLogitsLoss()
+        self.loss_function = nn.BCEWithLogitsLoss()
 
     def forward(self, x, target):
 
@@ -167,9 +166,9 @@ class OutputLayer(nn.Module):
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
 
-        # loss = self.loss_function(y, target)
-        # return y, loss
-        return y
+        loss = self.loss_function(y, target)
+        return y, loss
+        # return y
 
 
 class CNN(nn.Module):
@@ -180,13 +179,11 @@ class CNN(nn.Module):
 
         filter_size = int(args.filter_size)
 
-
         self.conv = nn.Conv1d(self.word_rep.feature_size, args.num_filter_maps, kernel_size=filter_size,
                                   padding=int(floor(filter_size / 2)))
         xavier_uniform(self.conv.weight)
 
         self.output_layer = OutputLayer(args, Y, dicts, args.num_filter_maps)
-
 
     def forward(self, x, target, text_inputs):
 
@@ -262,7 +259,7 @@ class ResidualBlock(nn.Module):
             nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(kernel_size / 2)), bias=False),
             nn.BatchNorm1d(outchannel)
         )
-        self.se = SE_Block(outchannel)
+        # self.se = SE_Block(outchannel)
         self.use_res = use_res
         if self.use_res:
             self.shortcut = nn.Sequential(
@@ -274,7 +271,7 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         out = self.left(x)
-        out = self.se(out)
+        # out = self.se(out)
         if self.use_res:
             out += self.shortcut(x)
         out = torch.tanh(out)
@@ -450,17 +447,17 @@ class MultiResCNN_GCN(nn.Module):
 
 
 def pick_model(args, dicts, num_class):
-    Y = len(dicts['ind2c'])
+    # Y = len(dicts['ind2c'])
     if args.model == 'CNN':
-        model = CNN(args, Y, dicts)
+        model = CNN(args, num_class, dicts)
     elif args.model == 'MultiCNN':
-        model = MultiCNN(args, Y, dicts)
+        model = MultiCNN(args, num_class, dicts)
     elif args.model == 'ResCNN':
-        model = ResCNN(args, Y, dicts)
+        model = ResCNN(args, num_class, dicts)
     elif args.model == 'MultiResCNN':
-        model = MultiResCNN(args, Y, dicts)
+        model = MultiResCNN(args, num_class, dicts)
     elif args.model == 'MultiSeResCNN_GCN':
-        model = MultiResCNN_GCN(args, Y, dicts, num_class)
+        model = MultiResCNN_GCN(args, num_class, dicts, num_class)
     else:
         raise RuntimeError("wrong model name")
 

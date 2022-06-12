@@ -172,7 +172,7 @@ if __name__ == "__main__":
                 print("%s hasn't improved in %d epochs, early stopping..." % (args.criterion, args.patience))
                 test_only = True
                 args.test_model = '%s/model_best_%s.pth' % (model_dir, args.criterion)
-                model = pick_model(args, dicts)
+                model = pick_model(args, dicts, num_nodes)
 
 
 
