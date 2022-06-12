@@ -259,7 +259,7 @@ class ResidualBlock(nn.Module):
             nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(kernel_size / 2)), bias=False),
             nn.BatchNorm1d(outchannel)
         )
-        # self.se = SE_Block(outchannel)
+        self.se = SE_Block(outchannel)
         self.use_res = use_res
         if self.use_res:
             self.shortcut = nn.Sequential(
@@ -271,7 +271,7 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         out = self.left(x)
-        # out = self.se(out)
+        out = self.se(out)
         if self.use_res:
             out += self.shortcut(x)
         out = torch.tanh(out)
