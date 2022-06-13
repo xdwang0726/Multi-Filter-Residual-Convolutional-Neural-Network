@@ -395,11 +395,11 @@ class MultiResCNN_GCN(nn.Module):
 
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
-        self.U = nn.Linear(args.num_filter_maps * self.filter_num, args.embedding_size*2)
-        nn.init.xavier_uniform_(self.U.weight)
+        # self.U = nn.Linear(args.num_filter_maps * self.filter_num, args.embedding_size*2)
+        # nn.init.xavier_uniform_(self.U.weight)
 
         # label graph
-        self.gcn = LabelNet(args.embedding_size, args.num_filter_maps, args.embedding_size)
+        self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
 
         # corNet
         self.cornet = CorNet(num_class, cornet_dim, n_cornet_blocks)
@@ -432,9 +432,9 @@ class MultiResCNN_GCN(nn.Module):
             # atten = torch.softmax(torch.matmul(tmp, atten_mask), dim=1)
             # atten_tmp = torch.matmul(tmp.transpose(1, 2), atten).transpose(1, 2)
             conv_result.append(tmp)
-        x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 100 * len(ksz_list))
+        x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 50 * len(ksz_list))
 
-        x = self.U(x)
+        # x = self.U(x)
         # print('x', x.size())
         atten = torch.softmax(torch.matmul(x, atten_mask), dim=1)
         atten_x = torch.matmul(x.transpose(1, 2), atten).transpose(1, 2)
