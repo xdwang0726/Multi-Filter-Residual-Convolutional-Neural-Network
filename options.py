@@ -16,7 +16,7 @@ parser.add_argument("-version", type=str, choices=['mimic2', 'mimic3'], default=
 parser.add_argument("-MAX_LENGTH", type=int, default=2500)
 
 # model
-parser.add_argument("-model", type=str, choices=['CNN', 'MultiCNN', 'ResCNN', 'MultiResCNN', 'MultiSeResCNN_GCN'], default='MultiSeResCNN_GCN')
+parser.add_argument("-model", type=str, choices=['CNN', 'MultiCNN', 'ResCNN', 'MultiResCNN', 'MultiSeResCNN_GCN', 'RNN_GCN'], default='MultiSeResCNN_GCN')
 parser.add_argument("-filter_size", type=str, default="5,15")
 parser.add_argument("-embedding_size", type=int, default=100)
 parser.add_argument("-num_filter_maps", type=int, default=100)

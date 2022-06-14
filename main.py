@@ -20,7 +20,6 @@ from utils import load_lookups, prepare_instance, MyDataset, my_collate, early_s
 
 if __name__ == "__main__":
 
-
     if args.random_seed != 0:
         random.seed(args.random_seed)
         np.random.seed(args.random_seed)
