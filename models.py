@@ -457,6 +457,7 @@ class MultiResCNN_GCN(nn.Module):
 
 class RNN_GCN(nn.Module):
     def __init__(self, args, Y, dicts, num_class, cornet_dim=1000, n_cornet_blocks=2):
+        super(RNN_GCN, self).__init__()
 
         self.word_rep = WordRep(args, Y, dicts)
         self.rnn = nn.LSTM(input_size=args.embedding_size, hidden_size=args.embedding_size,
