@@ -592,7 +592,7 @@ def my_collate(x):
     # text_inputs = batch_to_ids(text_inputs)
 
     # return inputs_id, labels, text_inputs
-    return inputs_id, labels, masks
+    return inputs_id, seq_len, labels, masks
 
 
 def early_stop(metrics_hist, criterion, patience):

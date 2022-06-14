@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from utils import all_metrics, print_metrics
 
+
 def train(args, mlb, model, optimizer, epoch, gpu, data_loader, G):
 
     print("EPOCH %d" % epoch)
@@ -31,9 +32,10 @@ def train(args, mlb, model, optimizer, epoch, gpu, data_loader, G):
             output, loss = model(inputs_id, segments, masks, labels)
         else:
 
-            inputs_id, labels, masks = next(data_iter)
+            inputs_id, seq_len, labels, masks = next(data_iter)
 
             inputs_id = torch.LongTensor(inputs_id)
+            seq_len = torch.Tensor(seq_len)
             labels = torch.from_numpy(mlb.fit_transform(labels)).type(torch.float)
             masks = torch.from_numpy(mlb.fit_transform(masks)).type(torch.float)
 
@@ -42,7 +44,7 @@ def train(args, mlb, model, optimizer, epoch, gpu, data_loader, G):
                 G, G.ndata['feat'] = G.to('cuda'), G.ndata['feat'].to('cuda')
 
             # output, loss = model(inputs_id, labels)
-            output, loss = model(inputs_id, labels, masks, G, G.ndata['feat'])
+            output, loss = model(inputs_id, seq_len, labels, masks, G, G.ndata['feat'])
 
         optimizer.zero_grad()
         loss.backward()
@@ -82,9 +84,10 @@ def test(args, mlb, model, data_path, fold, gpu, dicts, data_loader, G):
                 output, loss = model(inputs_id, segments, masks, labels)
             else:
 
-                inputs_id, labels, masks = next(data_iter)
+                inputs_id, seq_len, labels, masks = next(data_iter)
 
                 inputs_id = torch.LongTensor(inputs_id)
+                seq_len = torch.Tensor(seq_len)
                 labels = torch.from_numpy(mlb.fit_transform(labels)).type(torch.float)
                 masks = torch.from_numpy(mlb.fit_transform(masks)).type(torch.float)
 
@@ -93,7 +96,7 @@ def test(args, mlb, model, data_path, fold, gpu, dicts, data_loader, G):
                     G, G.ndata['feat'] = G.to('cuda'), G.ndata['feat'].to('cuda')
 
                 # output, loss = model(inputs_id, labels)
-                output, loss = model(inputs_id, labels, masks, G, G.ndata['feat'])
+                output, loss = model(inputs_id, seq_len, labels, masks, G, G.ndata['feat'])
 
             output = torch.sigmoid(output)
             output = output.data.cpu().numpy()

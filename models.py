@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.init import xavier_uniform_ as xavier_uniform
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from utils import build_pretrain_embedding, load_embeddings
 
@@ -454,6 +455,45 @@ class MultiResCNN_GCN(nn.Module):
             p.requires_grad = False
 
 
+class RNN_GCN(nn.Module):
+    def __init__(self, args, Y, dicts, num_class, cornet_dim=1000, n_cornet_blocks=2):
+
+        self.word_rep = WordRep(args, Y, dicts)
+        self.rnn = nn.LSTM(input_size=args.embedding_size, hidden_size=args.embedding_size,
+                           num_layers=args.rnn_num_layers, dropout=self.dropout if self.n_layers > 1 else 0,
+                           bidirectional=True, batch_first=True)
+
+        self.dropout = nn.Dropout(args.dropout)
+
+        self.gcn = LabelNet(self.embedding_dim, self.embedding_dim, self.embedding_dim)
+
+        self.cornet = CorNet(self.output_size, cornet_dim, n_cornet_blocks)
+
+    def forward(self, x, x_length, target, mask, g, g_node_feature):
+        # Get label embeddings:
+        label_feature = self.gcn(g, g_node_feature)
+        label_feature = torch.cat((label_feature, g_node_feature), dim=1) # torch.Size([num_label, 100*2])
+        atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
+
+        x = self.word_rep(x, target)
+        x = x.transpose(1, 2)
+        x = pack_padded_sequence(x, x_length, batch_first=True, enforce_sorted=False)  # packed input title
+        x, (_,_) = self.rnn(x)
+        x, _ = pad_packed_sequence(x, batch_first=True)
+
+        x_atten = torch.softmax(torch.matmul(x, atten_mask), dim=1)
+        x_feature = torch.matmul(x.transpose(1, 2), x_atten).transpose(1, 2)
+
+        x_feature = torch.sum(x_feature * label_feature, dim=2)
+        y = self.cornet(x_feature)
+        loss = self.loss_function(y, target)
+        return y, loss
+
+    def freeze_net(self):
+        for p in self.word_rep.embed.parameters():
+            p.requires_grad = False
+
+
 def pick_model(args, dicts, num_class):
     # Y = len(dicts['ind2c'])
     if args.model == 'CNN':
@@ -466,6 +506,8 @@ def pick_model(args, dicts, num_class):
         model = MultiResCNN(args, num_class, dicts)
     elif args.model == 'MultiSeResCNN_GCN':
         model = MultiResCNN_GCN(args, num_class, dicts, num_class)
+    elif args.model == 'RNN_GCN':
+        model = RNN_GCN(args, num_class, dicts, num_class)
     else:
         raise RuntimeError("wrong model name")
 
