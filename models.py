@@ -442,6 +442,7 @@ class MultiResCNN_atten(nn.Module):
         label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
 
         atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
+        print('mask', atten_mask.size())
 
         # x = self.word_rep(x, target, text_inputs)
         x = self.word_rep(x, target)
@@ -459,6 +460,7 @@ class MultiResCNN_atten(nn.Module):
             tmp = tmp.transpose(1, 2)
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
+        print('x', x.size())
 
         y, loss = self.output_layer(x, target, atten_mask)
 
