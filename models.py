@@ -466,9 +466,9 @@ class RNN_GCN(nn.Module):
 
         self.dropout = nn.Dropout(args.dropout)
 
-        self.gcn = LabelNet(self.embedding_dim, self.embedding_dim, self.embedding_dim)
+        self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
 
-        self.cornet = CorNet(self.output_size, cornet_dim, n_cornet_blocks)
+        self.cornet = CorNet(num_class, cornet_dim, n_cornet_blocks)
 
     def forward(self, x, x_length, target, mask, g, g_node_feature):
         # Get label embeddings:
