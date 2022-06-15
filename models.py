@@ -603,7 +603,7 @@ class DCAN(nn.Module):
     def forward(self, data, target, text_inputs=None):
         # data: [bs, len]
         bs, seq_len = data.size(0), data.size(1)
-        x = self.word_rep(data, target, text_inputs)   # [bs, seq_len, dim_embed]
+        x = self.word_rep(data, target)   # [bs, seq_len, dim_embed]
         hid_seq = self.tcn(x.transpose(1, 2)).transpose(1, 2)   # [bs, seq_len, nhid]
         hid_seq = F.relu(self.lin(hid_seq))
         logits, loss = self.output_layer(hid_seq, target, None)
