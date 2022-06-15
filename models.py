@@ -163,8 +163,12 @@ class OutputLayer(nn.Module):
     def forward(self, x, target):
 
         alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
-
+        print('alpha', alpha.size())
         m = alpha.matmul(x)
+        print('m', m.size())
+
+        # alpha = torch.softmax(torch.matmul(x, mask), dim=1)
+        # m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
 
@@ -348,6 +352,63 @@ class MultiResCNN(nn.Module):
 
     def __init__(self, args, Y, dicts):
         super(MultiResCNN, self).__init__()
+
+        self.word_rep = WordRep(args, Y, dicts)
+
+        self.conv = nn.ModuleList()
+        filter_sizes = args.filter_size.split(',')
+
+        self.filter_num = len(filter_sizes)
+        for filter_size in filter_sizes:
+            filter_size = int(filter_size)
+            one_channel = nn.ModuleList()
+            tmp = nn.Conv1d(self.word_rep.feature_size, self.word_rep.feature_size, kernel_size=filter_size,
+                            padding=int(floor(filter_size / 2)))
+            xavier_uniform(tmp.weight)
+            one_channel.add_module('baseconv', tmp)
+
+            conv_dimension = self.word_rep.conv_dict[args.conv_layer]
+            for idx in range(args.conv_layer):
+                tmp = ResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], filter_size, 1, True,
+                                    args.dropout)
+                one_channel.add_module('se-resconv-{}'.format(idx), tmp)
+
+            self.conv.add_module('channel-{}'.format(filter_size), one_channel)
+
+        self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
+
+    def forward(self, x, target):
+
+        # x = self.word_rep(x, target, text_inputs)
+        x = self.word_rep(x, target)
+
+        x = x.transpose(1, 2)
+
+        conv_result = []
+        for conv in self.conv:
+            tmp = x
+            for idx, md in enumerate(conv):
+                if idx == 0:
+                    tmp = torch.tanh(md(tmp))
+                else:
+                    tmp = md(tmp)
+            tmp = tmp.transpose(1, 2)
+            conv_result.append(tmp)
+        x = torch.cat(conv_result, dim=2)
+
+        y, loss = self.output_layer(x, target)
+
+        return y, loss
+
+    def freeze_net(self):
+        for p in self.word_rep.embed.parameters():
+            p.requires_grad = False
+
+
+class MultiResCNN_atten(nn.Module):
+
+    def __init__(self, args, Y, dicts):
+        super(MultiResCNN_atten, self).__init__()
 
         self.word_rep = WordRep(args, Y, dicts)
 

@@ -483,7 +483,7 @@ def load_lookups(args):
         codes = set()
         with open("%s/TOP_%s_CODES.csv" % (args.MIMIC_3_DIR, str(args.Y)), 'r') as labelfile:
             lr = csv.reader(labelfile)
-            for i,row in enumerate(lr):
+            for i, row in enumerate(lr):
                 codes.add(row[0])
         ind2c = {i: c for i, c in enumerate(sorted(codes))}
 
