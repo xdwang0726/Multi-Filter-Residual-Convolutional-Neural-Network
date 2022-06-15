@@ -477,6 +477,7 @@ class RNN_GCN(nn.Module):
         atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
 
         x = self.word_rep(x, target)
+        print(x.size())
         x = x.transpose(1, 2)
         x = pack_padded_sequence(x, x_length, batch_first=True, enforce_sorted=False)  # packed input title
         x, (_,_) = self.rnn(x)
