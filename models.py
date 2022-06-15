@@ -158,23 +158,23 @@ class OutputLayer(nn.Module):
         self.final = nn.Linear(input_size, Y)
         xavier_uniform(self.final.weight)
 
-        # self.loss_function = nn.BCEWithLogitsLoss()
+        self.loss_function = nn.BCEWithLogitsLoss()
 
-    def forward(self, x, target):
+    def forward(self, x, target, mask):
 
-        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
-        print('alpha', alpha.size())
-        m = alpha.matmul(x)
-        print('m', m.size())
+        # alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
+        # print('alpha', alpha.size())
+        # m = alpha.matmul(x)
+        # print('m', m.size())
 
-        # alpha = torch.softmax(torch.matmul(x, mask), dim=1)
-        # m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
+        alpha = torch.softmax(torch.matmul(x, mask), dim=1)
+        m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
 
-        # loss = self.loss_function(y, target)
-        # return y, loss
-        return y
+        loss = self.loss_function(y, target)
+        return y, loss
+        # return y
 
 
 def label_smoothing(y, alpha, Y):
@@ -377,7 +377,7 @@ class MultiResCNN(nn.Module):
 
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
-    def forward(self, x, target):
+    def forward(self, x, target, mask):
 
         # x = self.word_rep(x, target, text_inputs)
         x = self.word_rep(x, target)
@@ -396,7 +396,7 @@ class MultiResCNN(nn.Module):
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
 
-        y, loss = self.output_layer(x, target)
+        y, loss = self.output_layer(x, target, mask)
 
         return y, loss
 
