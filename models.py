@@ -461,7 +461,7 @@ class RNN_GCN(nn.Module):
 
         self.word_rep = WordRep(args, Y, dicts)
         self.rnn = nn.LSTM(input_size=args.embedding_size, hidden_size=args.embedding_size,
-                           num_layers=args.rnn_num_layers, dropout=self.dropout if self.n_layers > 1 else 0,
+                           num_layers=args.rnn_num_layers, dropout=self.dropout if args.rnn_num_layers > 1 else 0,
                            bidirectional=True, batch_first=True)
 
         self.dropout = nn.Dropout(args.dropout)
