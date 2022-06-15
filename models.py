@@ -377,7 +377,7 @@ class MultiResCNN(nn.Module):
 
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
-    def forward(self, x, target, mask):
+    def forward(self, x, target):
 
         # x = self.word_rep(x, target, text_inputs)
         x = self.word_rep(x, target)
@@ -396,7 +396,7 @@ class MultiResCNN(nn.Module):
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
 
-        y, loss = self.output_layer(x, target, mask)
+        y, loss = self.output_layer(x, target)
 
         return y, loss
 
@@ -432,9 +432,16 @@ class MultiResCNN_atten(nn.Module):
 
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
+        # label graph
+        self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
+
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
-    def forward(self, x, target):
+    def forward(self, x, target, mask, g, g_node_feature):
+        label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
+        label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
+
+        atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
 
         # x = self.word_rep(x, target, text_inputs)
         x = self.word_rep(x, target)
@@ -453,7 +460,7 @@ class MultiResCNN_atten(nn.Module):
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
 
-        y, loss = self.output_layer(x, target)
+        y, loss = self.output_layer(x, target, atten_mask)
 
         return y, loss
 
@@ -691,6 +698,8 @@ def pick_model(args, dicts, num_class):
         model = RNN_GCN(args, num_class, dicts, num_class)
     elif args.model == 'DCAN':
         model = DCAN(args, num_class, dicts)
+    elif args.model == 'MultiResCNN_atten':
+        model = MultiResCNN_atten(args, num_class, dicts)
     else:
         raise RuntimeError("wrong model name")
 
