@@ -44,7 +44,7 @@ def train(args, mlb, model, optimizer, epoch, gpu, data_loader, G):
                 G, G.ndata['feat'] = G.to('cuda'), G.ndata['feat'].to('cuda')
 
             # output, loss = model(inputs_id, labels)
-            output, loss = model(inputs_id, seq_len, labels, masks, G, G.ndata['feat'])
+            output, loss = model(inputs_id, labels, masks, G, G.ndata['feat'])
 
         optimizer.zero_grad()
         loss.backward()
@@ -96,7 +96,7 @@ def test(args, mlb, model, data_path, fold, gpu, dicts, data_loader, G):
                     G, G.ndata['feat'] = G.to('cuda'), G.ndata['feat'].to('cuda')
 
                 # output, loss = model(inputs_id, labels)
-                output, loss = model(inputs_id, seq_len, labels, masks, G, G.ndata['feat'])
+                output, loss = model(inputs_id, labels, masks, G, G.ndata['feat'])
 
             output = torch.sigmoid(output)
             output = output.data.cpu().numpy()
