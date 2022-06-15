@@ -470,6 +470,9 @@ class RNN_GCN(nn.Module):
 
         self.cornet = CorNet(num_class, cornet_dim, n_cornet_blocks)
 
+        # loss
+        self.loss_function = nn.BCEWithLogitsLoss()
+
     def forward(self, x, x_length, target, mask, g, g_node_feature):
         # Get label embeddings:
         label_feature = self.gcn(g, g_node_feature)
