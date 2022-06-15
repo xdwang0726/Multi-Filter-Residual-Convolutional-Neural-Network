@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.init import xavier_uniform_ as xavier_uniform
+from torch.nn.utils import weight_norm
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from utils import build_pretrain_embedding, load_embeddings
@@ -170,6 +171,35 @@ class OutputLayer(nn.Module):
         # loss = self.loss_function(y, target)
         # return y, loss
         return y
+
+
+def label_smoothing(y, alpha, Y):
+    return y*(1-alpha) + alpha/Y
+
+
+class OutputLayer_label_smooth(nn.Module):
+    def __init__(self, args, Y, dicts, input_size):
+        super(OutputLayer_label_smooth, self).__init__()
+        self.args = args
+        self.Y = Y
+        self.U = nn.Linear(input_size, Y)
+        self.final = nn.Linear(input_size, Y)
+        xavier_uniform(self.U.weight)
+        xavier_uniform(self.final.weight)
+        self.loss_func = nn.BCEWithLogitsLoss()
+
+    def forward(self, x, target, text_inputs):
+        att = self.U.weight.matmul(x.transpose(1, 2)) # [bs, Y, seq_len]
+        alpha = F.softmax(att, dim=2)
+        m = alpha.matmul(x)     # [bs, Y, dim]
+        logits = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
+        if self.args.label_smoothing:
+            target = label_smoothing(target, self.args.alpha, self.Y)
+            yhat = torch.sigmoid(logits)
+            loss = torch.mean(-target*torch.log(yhat) - (1-target)*torch.log(1-yhat))
+        else:
+            loss = self.loss_func(logits, target)
+        return logits, loss
 
 
 class CNN(nn.Module):
@@ -498,6 +528,92 @@ class RNN_GCN(nn.Module):
             p.requires_grad = False
 
 
+class Chomp1d(nn.Module):
+    def __init__(self, chomp_size):
+        super(Chomp1d, self).__init__()
+        self.chomp_size = chomp_size
+
+    def forward(self, x):
+        return x[:, :, :-self.chomp_size].contiguous()
+
+
+class TemporalBlock(nn.Module):
+    def __init__(self, n_inputs, n_outputs, kernel_size, stride, dilation, padding, dropout=0.2):
+        super(TemporalBlock, self).__init__()
+        self.conv1 = weight_norm(nn.Conv1d(n_inputs, n_outputs, kernel_size,
+                                           stride=stride, padding=padding, dilation=dilation))
+        self.chomp1 = Chomp1d(padding)
+        self.relu1 = nn.ReLU()
+        self.dropout1 = nn.Dropout(dropout)
+
+        self.conv2 = weight_norm(nn.Conv1d(n_outputs, n_outputs, kernel_size,
+                                           stride=stride, padding=padding, dilation=dilation))
+        self.chomp2 = Chomp1d(padding)
+        self.relu2 = nn.ReLU()
+        self.dropout2 = nn.Dropout(dropout)
+
+        self.net = nn.Sequential(self.conv1, self.chomp1, self.relu1, self.dropout1,
+                                 self.conv2, self.chomp2, self.relu2, self.dropout2)
+        self.downsample = nn.Conv1d(n_inputs, n_outputs, 1) if n_inputs != n_outputs else None
+        self.relu = nn.ReLU()
+        self.init_weights()
+
+    def init_weights(self):
+        xavier_uniform(self.conv1.weight)
+        xavier_uniform(self.conv2.weight)
+        if self.downsample is not None:
+            xavier_uniform(self.downsample.weight)
+
+    def forward(self, x):
+        out = self.net(x)
+        res = x if self.downsample is None else self.downsample(x)
+        return self.relu(out + res)
+
+
+class TemporalConvNet(nn.Module):
+    def __init__(self, num_inputs, num_channels, kernel_size=2, dropout=0.2):
+        super(TemporalConvNet, self).__init__()
+        layers = []
+        num_levels = len(num_channels)
+        for i in range(num_levels):
+            dilation_size = 2 ** i
+            in_channels = num_inputs if i == 0 else num_channels[i-1]
+            out_channels = num_channels[i]
+            layers += [TemporalBlock(in_channels, out_channels, kernel_size, stride=1, dilation=dilation_size,
+                                     padding=(kernel_size-1) * dilation_size, dropout=dropout)]
+
+        self.network = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.network(x)
+
+
+class DCAN(nn.Module):
+    def __init__(self, args, Y, dicts):
+        super(DCAN, self).__init__()
+        self.configs = args
+        self.word_rep = WordRep(args, Y, dicts)
+        num_chans = [args.nhid] * args.levels
+        self.tcn = TemporalConvNet(self.word_rep.feature_size, num_chans, args.kernel_size, args.dropout)
+        self.lin = nn.Linear(num_chans[-1], args.nproj)
+        self.output_layer = OutputLayer_label_smooth(args, Y, dicts, args.nproj)
+
+        xavier_uniform(self.lin.weight)
+
+    def forward(self, data, target, text_inputs=None):
+        # data: [bs, len]
+        bs, seq_len = data.size(0), data.size(1)
+        x = self.word_rep(data, target, text_inputs)   # [bs, seq_len, dim_embed]
+        hid_seq = self.tcn(x.transpose(1, 2)).transpose(1, 2)   # [bs, seq_len, nhid]
+        hid_seq = F.relu(self.lin(hid_seq))
+        logits, loss = self.output_layer(hid_seq, target, None)
+        return logits, loss
+
+    def freeze_net(self):
+        for p in self.word_rep.embed.parameters():
+            p.requires_grad = False
+
+
 def pick_model(args, dicts, num_class):
     # Y = len(dicts['ind2c'])
     if args.model == 'CNN':
@@ -512,6 +628,8 @@ def pick_model(args, dicts, num_class):
         model = MultiResCNN_GCN(args, num_class, dicts, num_class)
     elif args.model == 'RNN_GCN':
         model = RNN_GCN(args, num_class, dicts, num_class)
+    elif args.model == 'DCAN':
+        model = DCAN(args, num_class, dicts)
     else:
         raise RuntimeError("wrong model name")
 
