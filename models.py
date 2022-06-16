@@ -162,13 +162,14 @@ class OutputLayer(nn.Module):
 
     def forward(self, x, target, mask):
 
-        # alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
+        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
         # print('alpha', alpha.size())
-        # m = alpha.matmul(x)
+        m = alpha.matmul(x) # [bs, Y, dim]
         # print('m', m.size())
 
-        alpha = torch.softmax(torch.matmul(x, mask), dim=1)
-        m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
+        m = m.transpose(0, 1) * mask.unsqueeze(1)
+        # alpha = torch.softmax(torch.matmul(x, mask), dim=1)
+        # m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
 
@@ -437,16 +438,16 @@ class MultiResCNN_atten(nn.Module):
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
         # label graph
-        self.gcn = LabelNet(256, self.filter_num * args.num_filter_maps, args.embedding_size)
+        # self.gcn = LabelNet(256, self.filter_num * args.num_filter_maps, args.embedding_size)
 
         # self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
-        self.output_layer = OutputLayer_label_smooth(args, Y, dicts, self.filter_num * args.num_filter_maps)
+        self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
     def forward(self, x, target, mask, g, g_node_feature):
-        label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
+        # label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
         # label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
 
-        atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
+        # atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
         # print('mask', atten_mask.size())
 
         # x = self.word_rep(x, target, text_inputs)
@@ -467,7 +468,7 @@ class MultiResCNN_atten(nn.Module):
         x = torch.cat(conv_result, dim=2)
         # print('x', x.size())
 
-        y, loss = self.output_layer(x, target, atten_mask)
+        y, loss = self.output_layer(x, target, mask)
 
         return y, loss
 
