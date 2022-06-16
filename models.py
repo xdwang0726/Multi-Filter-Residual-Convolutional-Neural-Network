@@ -722,7 +722,7 @@ def pick_model(args, dicts, num_class):
     elif args.model == 'MultiResCNN':
         model = MultiResCNN(args, num_class, dicts)
     elif args.model == 'MultiResCNN_GCN':
-        model = MultiResCNN_GCN(args, num_class, dicts)
+        model = MultiResCNN_GCN(args, num_class, dicts, num_class)
     elif args.model == 'MultiSeResCNN_GCN':
         model = MultiResCNN_GCN(args, num_class, dicts, num_class)
     elif args.model == 'RNN_GCN':
