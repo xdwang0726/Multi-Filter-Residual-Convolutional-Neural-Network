@@ -158,7 +158,7 @@ class OutputLayer(nn.Module):
         self.final = nn.Linear(input_size, Y)
         xavier_uniform(self.final.weight)
 
-        self.loss_function = nn.BCEWithLogitsLoss()
+        # self.loss_function = nn.BCEWithLogitsLoss()
 
     def forward(self, x, target, mask):
 
@@ -176,9 +176,9 @@ class OutputLayer(nn.Module):
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
 
-        loss = self.loss_function(y, target)
-        return y, loss
-        # return y
+        # loss = self.loss_function(y, target)
+        # return y, loss
+        return y
 
 
 def label_smoothing(y, alpha, Y):
@@ -415,7 +415,7 @@ class MultiResCNN(nn.Module):
 
 class MultiResCNN_atten(nn.Module):
 
-    def __init__(self, args, Y, dicts):
+    def __init__(self, args, Y, dicts, cornet_dim=1000, n_cornet_blocks=2):
         super(MultiResCNN_atten, self).__init__()
 
         self.word_rep = WordRep(args, Y, dicts)
@@ -446,6 +446,12 @@ class MultiResCNN_atten(nn.Module):
         # self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
+        # corNet
+        self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
+
+        # loss
+        self.loss_function = nn.BCEWithLogitsLoss()
+
     def forward(self, x, target, mask, g, g_node_feature):
         # label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
         # label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
@@ -471,7 +477,9 @@ class MultiResCNN_atten(nn.Module):
         x = torch.cat(conv_result, dim=2)
         # print('x', x.size())
 
-        y, loss = self.output_layer(x, target, mask)
+        y = self.output_layer(x, target, mask)
+        y = self.cornet(y)
+        loss = self.loss_function(y, target)
 
         return y, loss
 
@@ -507,6 +515,8 @@ class MultiResCNN_GCN(nn.Module):
 
         # self.U = nn.Linear(args.num_filter_maps * self.filter_num, args.embedding_size*2)
         # nn.init.xavier_uniform_(self.U.weight)
+        self.U = nn.Linear(args.num_filter_maps * self.filter_num, Y)
+        xavier_uniform(self.U.weight)
 
         # label graph
         self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
@@ -544,6 +554,11 @@ class MultiResCNN_GCN(nn.Module):
             atten_tmp = torch.matmul(tmp.transpose(1, 2), atten).transpose(1, 2)
             conv_result.append(atten_tmp)
         x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 50 * len(ksz_list))
+
+        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
+        m = alpha.matmul(x) # [bs, Y, dim]
+        m = m.transpose(1, 2) * mask.unsqueeze(1)
+        m = m.transpose(1, 2)  # size: (bs, num_label, 50 * len(ksz_list))
 
         # x = self.U(x)
         # print('x', x.size())
