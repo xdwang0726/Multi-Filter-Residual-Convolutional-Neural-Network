@@ -165,9 +165,10 @@ class OutputLayer(nn.Module):
         alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
         # print('alpha', alpha.size())
         m = alpha.matmul(x) # [bs, Y, dim]
-        # print('m', m.size())
+        print('m', m.size())
+        print('mask', mask.size())
 
-        m = m.transpose(0, 1) * mask.unsqueeze(1)
+        m = m.transpose(1, 2) * mask.unsqueeze(1)
         # alpha = torch.softmax(torch.matmul(x, mask), dim=1)
         # m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
 
