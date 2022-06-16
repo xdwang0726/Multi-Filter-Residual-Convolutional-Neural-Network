@@ -152,8 +152,8 @@ class OutputLayer(nn.Module):
     def __init__(self, args, Y, dicts, input_size):
         super(OutputLayer, self).__init__()
 
-        # self.U = nn.Linear(input_size, Y)
-        # xavier_uniform(self.U.weight)
+        self.U = nn.Linear(input_size, Y)
+        xavier_uniform(self.U.weight)
 
         self.final = nn.Linear(input_size, Y)
         xavier_uniform(self.final.weight)
