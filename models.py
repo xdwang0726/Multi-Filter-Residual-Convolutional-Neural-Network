@@ -169,6 +169,7 @@ class OutputLayer(nn.Module):
         # print('mask', mask.size())
 
         m = m.transpose(1, 2) * mask.unsqueeze(1)
+        m = m.transpose(1, 2)
         print('m', m.size())
         # alpha = torch.softmax(torch.matmul(x, mask), dim=1)
         # m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
