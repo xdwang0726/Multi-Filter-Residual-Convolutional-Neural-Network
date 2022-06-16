@@ -152,8 +152,8 @@ class OutputLayer(nn.Module):
     def __init__(self, args, Y, dicts, input_size):
         super(OutputLayer, self).__init__()
 
-        self.U = nn.Linear(input_size, Y)
-        xavier_uniform(self.U.weight)
+        # self.U = nn.Linear(input_size, Y)
+        # xavier_uniform(self.U.weight)
 
         self.final = nn.Linear(input_size, Y)
         xavier_uniform(self.final.weight)
@@ -186,16 +186,20 @@ class OutputLayer_label_smooth(nn.Module):
         super(OutputLayer_label_smooth, self).__init__()
         self.args = args
         self.Y = Y
-        self.U = nn.Linear(input_size, Y)
+        # self.U = nn.Linear(input_size, Y)
         self.final = nn.Linear(input_size, Y)
-        xavier_uniform(self.U.weight)
+        # xavier_uniform(self.U.weight)
         xavier_uniform(self.final.weight)
         self.loss_func = nn.BCEWithLogitsLoss()
 
-    def forward(self, x, target, text_inputs):
-        att = self.U.weight.matmul(x.transpose(1, 2)) # [bs, Y, seq_len]
-        alpha = F.softmax(att, dim=2)
-        m = alpha.matmul(x)     # [bs, Y, dim]
+    def forward(self, x, target, mask):
+        # att = self.U.weight.matmul(x.transpose(1, 2)) # [bs, Y, seq_len]
+        # alpha = F.softmax(att, dim=2)
+        # m = alpha.matmul(x)     # [bs, Y, dim]
+
+        alpha = torch.softmax(torch.matmul(x, mask), dim=1)
+        m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
+
         logits = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
         if self.args.label_smoothing:
             target = label_smoothing(target, self.args.alpha, self.Y)
@@ -435,7 +439,8 @@ class MultiResCNN_atten(nn.Module):
         # label graph
         self.gcn = LabelNet(256, self.filter_num * args.num_filter_maps, args.embedding_size)
 
-        self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
+        # self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
+        self.output_layer = OutputLayer_label_smooth(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
     def forward(self, x, target, mask, g, g_node_feature):
         label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
