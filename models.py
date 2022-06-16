@@ -530,11 +530,11 @@ class MultiResCNN_GCN(nn.Module):
         self.loss_function = nn.BCEWithLogitsLoss()
 
     def forward(self, x, target, mask, g, g_node_feature):
-        print('g node', g_node_feature.size())
+
         label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
-        print('gcn output', label_feature.size())
+
         label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 300])
-        print('label_feature', label_feature.size())
+
 
         # atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
         # atten_mask = g_node_feature.transpose(0, 1) * mask.unsqueeze(1)
