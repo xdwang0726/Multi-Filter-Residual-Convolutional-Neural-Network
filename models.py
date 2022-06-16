@@ -433,13 +433,13 @@ class MultiResCNN_atten(nn.Module):
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
         # label graph
-        self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
+        self.gcn = LabelNet(256, self.filter_num * args.num_filter_maps, args.embedding_size)
 
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
     def forward(self, x, target, mask, g, g_node_feature):
         label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
-        label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
+        # label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
 
         atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
         # print('mask', atten_mask.size())
