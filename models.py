@@ -533,11 +533,11 @@ class MultiResCNN_GCN(nn.Module):
         print('g node', g_node_feature.size())
         label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
         print('gcn output', label_feature.size())
-        label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
+        label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 300])
         print('label_feature', label_feature.size())
 
         # atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
-        atten_mask = g_node_feature.transpose(0, 1) * mask.unsqueeze(1)
+        # atten_mask = g_node_feature.transpose(0, 1) * mask.unsqueeze(1)
         # print('mask', atten_mask.size())
 
         x = self.word_rep(x, target)
@@ -552,9 +552,9 @@ class MultiResCNN_GCN(nn.Module):
                 else:
                     tmp = md(tmp)
             tmp = tmp.transpose(1, 2)
-            atten = torch.softmax(torch.matmul(tmp, atten_mask), dim=1)
-            atten_tmp = torch.matmul(tmp.transpose(1, 2), atten).transpose(1, 2)
-            conv_result.append(atten_tmp)
+            # atten = torch.softmax(torch.matmul(tmp, atten_mask), dim=1)
+            # atten_tmp = torch.matmul(tmp.transpose(1, 2), atten).transpose(1, 2)
+            conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 50 * len(ksz_list))
 
         alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
