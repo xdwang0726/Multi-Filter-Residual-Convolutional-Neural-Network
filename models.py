@@ -519,7 +519,7 @@ class MultiResCNN_GCN(nn.Module):
         xavier_uniform(self.U.weight)
 
         # label graph
-        self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
+        self.gcn = LabelNet(256, args.embedding_size*2, args.embedding_size)
 
         # corNet
         self.cornet = CorNet(num_class, cornet_dim, n_cornet_blocks)
@@ -530,9 +530,11 @@ class MultiResCNN_GCN(nn.Module):
         self.loss_function = nn.BCEWithLogitsLoss()
 
     def forward(self, x, target, mask, g, g_node_feature):
-
+        print('g node', g_node_feature.size())
         label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
+        print('gcn output', label_feature.size())
         label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
+        print('label_feature', label_feature.size())
 
         # atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
         atten_mask = g_node_feature.transpose(0, 1) * mask.unsqueeze(1)
@@ -565,11 +567,12 @@ class MultiResCNN_GCN(nn.Module):
         # atten = torch.softmax(torch.matmul(x, atten_mask), dim=1)
         # atten_x = torch.matmul(x.transpose(1, 2), atten).transpose(1, 2)
 
-        feature = torch.sum(x * label_feature, dim=2)
-        y = self.cornet(feature)
+        # feature = torch.sum(x * label_feature, dim=2)
+        y = torch.sum(m * label_feature, dim=2)
+        y = self.cornet(y)
         #
         # y = self.output_layer(x, target)
-        # y = self.cornet(y)
+        y = self.cornet(y)
         loss = self.loss_function(y, target)
 
         return y, loss
@@ -718,6 +721,8 @@ def pick_model(args, dicts, num_class):
         model = ResCNN(args, num_class, dicts)
     elif args.model == 'MultiResCNN':
         model = MultiResCNN(args, num_class, dicts)
+    elif args.model == 'MultiResCNN_GCN':
+        model = MultiResCNN_GCN(args, num_class, dicts)
     elif args.model == 'MultiSeResCNN_GCN':
         model = MultiResCNN_GCN(args, num_class, dicts, num_class)
     elif args.model == 'RNN_GCN':
