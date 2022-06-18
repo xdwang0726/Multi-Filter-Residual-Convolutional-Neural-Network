@@ -168,8 +168,8 @@ class OutputLayer(nn.Module):
         # print('m', m.size())
         # print('mask', mask.size())
 
-        # m = m.transpose(1, 2) * mask.unsqueeze(1)
-        # m = m.transpose(1, 2)
+        m = m.transpose(1, 2) * mask.unsqueeze(1)
+        m = m.transpose(1, 2)
         # print('m', m.size())
         # alpha = torch.softmax(torch.matmul(x, mask), dim=1)
         # m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
@@ -385,7 +385,7 @@ class MultiResCNN(nn.Module):
 
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
-    def forward(self, x, target):
+    def forward(self, x, target, mask):
 
         # x = self.word_rep(x, target, text_inputs)
         x = self.word_rep(x, target)
@@ -404,7 +404,7 @@ class MultiResCNN(nn.Module):
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
 
-        y, loss = self.output_layer(x, target)
+        y, loss = self.output_layer(x, target, mask)
 
         return y, loss
 
