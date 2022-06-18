@@ -158,7 +158,7 @@ class OutputLayer(nn.Module):
         self.final = nn.Linear(input_size, Y)
         xavier_uniform(self.final.weight)
 
-        # self.loss_function = nn.BCEWithLogitsLoss()
+        self.loss_function = nn.BCEWithLogitsLoss()
 
     def forward(self, x, target, mask):
 
@@ -168,17 +168,17 @@ class OutputLayer(nn.Module):
         # print('m', m.size())
         # print('mask', mask.size())
 
-        m = m.transpose(1, 2) * mask.unsqueeze(1)
-        m = m.transpose(1, 2)
+        # m = m.transpose(1, 2) * mask.unsqueeze(1)
+        # m = m.transpose(1, 2)
         # print('m', m.size())
         # alpha = torch.softmax(torch.matmul(x, mask), dim=1)
         # m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
 
-        # loss = self.loss_function(y, target)
-        # return y, loss
-        return y
+        loss = self.loss_function(y, target)
+        return y, loss
+        # return y
 
 
 def label_smoothing(y, alpha, Y):
@@ -302,7 +302,7 @@ class ResidualBlock(nn.Module):
             nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(kernel_size / 2)), bias=False),
             nn.BatchNorm1d(outchannel)
         )
-        self.se = SE_Block(outchannel)
+        # self.se = SE_Block(outchannel)
         self.use_res = use_res
         if self.use_res:
             self.shortcut = nn.Sequential(
@@ -314,7 +314,7 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         out = self.left(x)
-        out = self.se(out)
+        # out = self.se(out)
         if self.use_res:
             out += self.shortcut(x)
         out = torch.tanh(out)
