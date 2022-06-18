@@ -744,6 +744,71 @@ class DilatedCNN(nn.Module):
             p.requires_grad = False
 
 
+class rnn_encoder(nn.Module):
+
+    def __init__(self, args, Y, dicts):
+        super(rnn_encoder, self).__init__()
+
+        self.word_rep = WordRep(args, Y, dicts)
+        self.rnn = nn.LSTM(input_size=args.embedding_size, hidden_size=args.embedding_size,
+                           num_layers=args.rnn_num_layers, dropout=self.dropout if args.rnn_num_layers > 1 else 0,
+                           bidirectional=True, batch_first=True)
+
+        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=1),
+                                   nn.SELU(), nn.AlphaDropout(p=0.05),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=2),
+                                   nn.SELU(), nn.AlphaDropout(p=0.05),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=3),
+                                   nn.SELU(), nn.AlphaDropout(p=0.05))
+
+    def forward(self, x, x_length, target):
+
+        x = self.word_rep(x, target)
+        rnn = pack_padded_sequence(x, x_length, batch_first=True, enforce_sorted=False)  # packed input title
+        rnn, state = self.rnn(rnn)
+        rnn, _ = pad_packed_sequence(rnn, batch_first=True)
+        rnn = rnn[:, :, :100] + rnn[:, :, 100:]  # size: (bs, seq_len, emb_dim)
+
+        conv = rnn.permute(0, 2, 1)
+        conv = self.dconv(conv)  # (bs, embed_dim, seq_len-ksz+1)
+        conv = conv.transpose(1, 2)
+
+        state = (state[0][::2], state[1][::2])
+
+        return rnn, state, conv
+
+
+class RNN_DCNN(nn.Module):
+    def __init__(self, args, Y, dicts):
+        super(rnn_encoder, self).__init__()
+
+        self.encoder = rnn_encoder(args, Y, dicts)
+
+        self.U = nn.Linear(args.embedding_size, Y)
+        xavier_uniform(self.U.weight)
+
+        self.final = nn.Linear(args.embedding_size*2, Y)
+        xavier_uniform(self.final.weight)
+
+        self.loss_function = nn.BCEWithLogitsLoss()
+
+    def forward(self, x, x_length, target):
+        rnn, state, conv = self.encoder(x, x_length)
+
+        alpha_rnn = F.softmax(self.U.weight.matmul(rnn.transpose(1, 2)), dim=2)
+        m_rnn = alpha_rnn.matmul(rnn)
+
+        alpha_conv = F.softmax(self.U.weight.matmul(conv), dim=2)
+        m_conv = alpha_conv.matmul(conv)
+
+        m = torch.cat((m_rnn, m_conv), dim=2)
+
+        y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
+
+        loss = self.loss_function(y, target)
+        return y, loss
+
+
 def pick_model(args, dicts, num_class):
     # Y = len(dicts['ind2c'])
     if args.model == 'CNN':
@@ -765,6 +830,8 @@ def pick_model(args, dicts, num_class):
     elif args.model == 'MultiResCNN_atten':
         model = MultiResCNN_atten(args, num_class, dicts)
     elif args.model == 'DilatedCNN':
+        model = DilatedCNN(args, num_class, dicts)
+    elif args.model == 'RNN_DCNN':
         model = DilatedCNN(args, num_class, dicts)
     else:
         raise RuntimeError("wrong model name")
