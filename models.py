@@ -793,7 +793,7 @@ class RNN_DCNN(nn.Module):
         self.loss_function = nn.BCEWithLogitsLoss()
 
     def forward(self, x, x_length, target):
-        rnn, state, conv = self.encoder(x, x_length)
+        rnn, state, conv = self.encoder(x, x_length, target)
 
         alpha_rnn = F.softmax(self.U.weight.matmul(rnn.transpose(1, 2)), dim=2)
         m_rnn = alpha_rnn.matmul(rnn)
