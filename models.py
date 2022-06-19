@@ -832,7 +832,7 @@ def pick_model(args, dicts, num_class):
     elif args.model == 'DilatedCNN':
         model = DilatedCNN(args, num_class, dicts)
     elif args.model == 'RNN_DCNN':
-        model = DilatedCNN(args, num_class, dicts)
+        model = RNN_DCNN(args, num_class, dicts)
     else:
         raise RuntimeError("wrong model name")
 
