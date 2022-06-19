@@ -780,7 +780,7 @@ class rnn_encoder(nn.Module):
 
 class RNN_DCNN(nn.Module):
     def __init__(self, args, Y, dicts):
-        super(rnn_encoder, self).__init__()
+        super(RNN_DCNN, self).__init__()
 
         self.encoder = rnn_encoder(args, Y, dicts)
 
