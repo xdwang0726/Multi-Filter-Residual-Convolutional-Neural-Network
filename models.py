@@ -797,8 +797,7 @@ class RNN_DCNN(nn.Module):
 
         alpha_rnn = F.softmax(self.U.weight.matmul(rnn.transpose(1, 2)), dim=2)
         m_rnn = alpha_rnn.matmul(rnn)
-        print('rnn', rnn.size())
-        print('conv', conv.size())
+
         alpha_conv = F.softmax(self.U.weight.matmul(conv.transpose(1, 2)), dim=2)
         m_conv = alpha_conv.matmul(conv)
 
