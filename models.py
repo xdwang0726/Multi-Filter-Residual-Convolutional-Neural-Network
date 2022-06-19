@@ -751,7 +751,7 @@ class rnn_encoder(nn.Module):
 
         self.word_rep = WordRep(args, Y, dicts)
         self.rnn = nn.LSTM(input_size=args.embedding_size, hidden_size=args.embedding_size,
-                           num_layers=args.rnn_num_layers, dropout=self.dropout if args.rnn_num_layers > 1 else 0,
+                           num_layers=args.rnn_num_layers, dropout=args.dropout if args.rnn_num_layers > 1 else 0,
                            bidirectional=True, batch_first=True)
 
         self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=1),
