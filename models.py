@@ -716,14 +716,21 @@ class DilatedCNN(nn.Module):
         super(DilatedCNN, self).__init__()
         self.word_rep = WordRep(args, Y, dicts)
 
-        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=5, padding=0, dilation=1),
+        self.dconv1 = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=1),
+                                   nn.SELU(), nn.AlphaDropout(p=0.05),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=2),
+                                   nn.SELU(), nn.AlphaDropout(p=0.05),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=3),
+                                   nn.SELU(), nn.AlphaDropout(p=0.05))
+
+        self.dconv2 = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=5, padding=0, dilation=1),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
                                    nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=5, padding=0, dilation=2),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
                                    nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=5, padding=0, dilation=3),
                                    nn.SELU(), nn.AlphaDropout(p=0.05))
 
-        self.output_layer = OutputLayer(args, Y, dicts, args.embedding_size)
+        self.output_layer = OutputLayer(args, Y, dicts, args.embedding_size*2)
 
         # loss
         self.loss_function = nn.BCEWithLogitsLoss()
@@ -732,7 +739,9 @@ class DilatedCNN(nn.Module):
 
         x = self.word_rep(x, target)
         x = x.permute(0, 2, 1)  # (bs, emb_dim, seq_length)
-        x = self.dconv(x)  # (bs, embed_dim, seq_len-ksz+1)
+        x1 = self.dconv1(x)  # (bs, embed_dim, seq_len-ksz+1)
+        x2 = self.dconv2(x)
+        x = torch.cat((x1, x2), dim=1)
         x = x.transpose(1, 2)
 
         y = self.output_layer(x, target, mask)
