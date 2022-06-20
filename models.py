@@ -603,7 +603,7 @@ class RNN_GCN(nn.Module):
     def forward(self, x, x_length, target, mask, g, g_node_feature):
         # Get label embeddings:
         label_feature = self.gcn(g, g_node_feature)
-        label_feature = torch.cat((label_feature, g_node_feature), dim=1) # torch.Size([num_label, 100*2])
+        label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 100*2])
         atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
 
         x = self.word_rep(x, target)
@@ -798,27 +798,39 @@ class rnn_encoder(nn.Module):
 
 
 class RNN_DCNN(nn.Module):
-    def __init__(self, args, Y, dicts):
+    def __init__(self, args, Y, dicts, cornet_dim=1000, n_cornet_blocks=2):
         super(RNN_DCNN, self).__init__()
 
         self.encoder = rnn_encoder(args, Y, dicts)
 
-        self.U = nn.Linear(args.embedding_size, Y)
-        xavier_uniform(self.U.weight)
+        # self.U = nn.Linear(args.embedding_size, Y)
+        # xavier_uniform(self.U.weight)
+
+        self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
+        self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
 
         self.final = nn.Linear(args.embedding_size*2, Y)
         xavier_uniform(self.final.weight)
 
         self.loss_function = nn.BCEWithLogitsLoss()
 
-    def forward(self, x, x_length, target):
+    def forward(self, x, x_length, target, mask, g, g_node_feature):
         rnn, state, conv = self.encoder(x, x_length, target)
 
-        alpha_rnn = F.softmax(self.U.weight.matmul(rnn.transpose(1, 2)), dim=2)
-        m_rnn = alpha_rnn.matmul(rnn)
+        label_feature = self.gcn(g, g_node_feature)
+        # label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 100*2])
+        atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
 
-        alpha_conv = F.softmax(self.U.weight.matmul(conv.transpose(1, 2)), dim=2)
-        m_conv = alpha_conv.matmul(conv)
+        # alpha_rnn = F.softmax(self.U.weight.matmul(rnn.transpose(1, 2)), dim=2)
+        # m_rnn = alpha_rnn.matmul(rnn)
+        #
+        # alpha_conv = F.softmax(self.U.weight.matmul(conv.transpose(1, 2)), dim=2)
+        # m_conv = alpha_conv.matmul(conv)
+        alpha_rnn = torch.softmax(torch.matmul(rnn, atten_mask), dim=1)
+        m_rnn = torch.matmul(rnn.transpose(1, 2), alpha_rnn).transpose(1, 2)
+
+        alpha_conv = torch.softmax(torch.matmul(conv, atten_mask), dim=1)
+        m_conv = torch.matmul(conv.transpose(1, 2), alpha_conv).transpose(1, 2)
 
         m = torch.cat((m_rnn, m_conv), dim=2)
 
