@@ -55,6 +55,7 @@ if __name__ == "__main__":
 
     if not args.test_model:
         optimizer = optim.Adam(model.parameters(), weight_decay=args.weight_decay, lr=args.lr)
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.scheduler_step_sz, gamma=args.lr_gamma)
     else:
         optimizer = None
 
@@ -124,7 +125,7 @@ if __name__ == "__main__":
 
         if not test_only:
             epoch_start = time.time()
-            losses = train(args, mlb, model, optimizer, epoch, args.gpu, train_loader, G)
+            losses = train(args, mlb, model, optimizer, epoch, args.gpu, train_loader, G, lr_scheduler)
             loss = np.mean(losses)
             epoch_finish = time.time()
             print("epoch finish in %.2fs, loss: %.4f" % (epoch_finish - epoch_start, loss))

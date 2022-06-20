@@ -34,12 +34,14 @@ parser.add_argument('--nproj', type=int, default=300, help='linear projection di
 parser.add_argument('--levels', type=int, default=1, help='number of levels')
 
 # training
-parser.add_argument("-n_epochs", type=int, default=500)
+parser.add_argument("-n_epochs", type=int, default=100)
 parser.add_argument("-dropout", type=float, default=0.2)
 parser.add_argument("-patience", type=int, default=10)
 parser.add_argument("-batch_size", type=int, default=16)
 parser.add_argument("-lr", type=float, default=1e-4)
 parser.add_argument("-weight_decay", type=float, default=0)
+parser.add_argument('-scheduler_step_sz', type=int, default=5)
+parser.add_argument('-lr_gamma', type=float, default=0.9)
 parser.add_argument("-criterion", type=str, default='prec_at_8', choices=['prec_at_8', 'f1_micro', 'prec_at_5'])
 parser.add_argument("-gpu", type=int, default=-1, help='-1 if not use gpu, >=0 if use gpu')
 parser.add_argument("-tune_wordemb", action="store_const", const=True, default=False)

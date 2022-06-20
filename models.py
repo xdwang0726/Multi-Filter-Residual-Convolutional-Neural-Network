@@ -744,6 +744,7 @@ class DilatedCNN(nn.Module):
         x = x.permute(0, 2, 1)  # (bs, emb_dim, seq_length)
         x1 = self.dconv1(x)  # (bs, embed_dim, seq_len-ksz+1)
         x2 = self.dconv2(x)
+        print('x2', x2.size())
 
         alpha1 = F.softmax(self.U.weight.matmul(x1.transpose(1, 2)), dim=2)
         m1 = alpha1.matmul(x1)

@@ -4,7 +4,7 @@ import numpy as np
 from utils import all_metrics, print_metrics
 
 
-def train(args, mlb, model, optimizer, epoch, gpu, data_loader, G):
+def train(args, mlb, model, optimizer, epoch, gpu, data_loader, G, lr_scheduler):
 
     print("EPOCH %d" % epoch)
 
@@ -51,6 +51,8 @@ def train(args, mlb, model, optimizer, epoch, gpu, data_loader, G):
         optimizer.step()
 
         losses.append(loss.item())
+    # Adjust the learning rate
+    lr_scheduler.step()
 
     return losses
 
