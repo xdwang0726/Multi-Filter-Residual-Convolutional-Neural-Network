@@ -730,9 +730,12 @@ class DilatedCNN(nn.Module):
                                    nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=5, padding=0, dilation=3),
                                    nn.SELU(), nn.AlphaDropout(p=0.05))
 
-        self.output_layer = OutputLayer(args, Y, dicts, args.embedding_size*2)
+        self.U = nn.Linear(args.embedding_size*2, Y)
+        xavier_uniform(self.U.weight)
 
-        # loss
+        self.final = nn.Linear(args.embedding_size*2, Y)
+        xavier_uniform(self.final.weight)
+
         self.loss_function = nn.BCEWithLogitsLoss()
 
     def forward(self, x, target, mask, g, g_node_feature):
@@ -742,9 +745,14 @@ class DilatedCNN(nn.Module):
         x1 = self.dconv1(x)  # (bs, embed_dim, seq_len-ksz+1)
         x2 = self.dconv2(x)
         x = torch.cat((x1, x2), dim=2)
+        print('x', x.size())
 
-        y = self.output_layer(x, target, mask)
+        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
+        m = alpha.matmul(x)
+
+        y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
         loss = self.loss_function(y, target)
+
         return y, loss
 
     def freeze_net(self):
