@@ -744,11 +744,13 @@ class DilatedCNN(nn.Module):
         x = x.permute(0, 2, 1)  # (bs, emb_dim, seq_length)
         x1 = self.dconv1(x)  # (bs, embed_dim, seq_len-ksz+1)
         x2 = self.dconv2(x)
-        x = torch.cat((x1, x2), dim=2)
-        print('x', x.size())
 
-        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
-        m = alpha.matmul(x)
+        alpha1 = F.softmax(self.U.weight.matmul(x1.transpose(1, 2)), dim=2)
+        m1 = alpha1.matmul(x1)
+        alpha2 = F.softmax(self.U.weight.matmul(x2.transpose(1, 2)), dim=2)
+        m2 = alpha2.matmul(x2)
+
+        m = torch.cat((m1, m2), dim=2)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
         loss = self.loss_function(y, target)
