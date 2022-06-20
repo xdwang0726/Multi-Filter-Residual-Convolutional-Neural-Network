@@ -742,7 +742,6 @@ class DilatedCNN(nn.Module):
         x1 = self.dconv1(x)  # (bs, embed_dim, seq_len-ksz+1)
         x2 = self.dconv2(x)
         x = torch.cat((x1, x2), dim=2)
-        x = x.transpose(1, 2)
 
         y = self.output_layer(x, target, mask)
         loss = self.loss_function(y, target)
