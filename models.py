@@ -730,7 +730,7 @@ class DilatedCNN(nn.Module):
                                    nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=5, padding=0, dilation=3),
                                    nn.SELU(), nn.AlphaDropout(p=0.05))
 
-        self.U = nn.Linear(args.embedding_size*2, Y)
+        self.U = nn.Linear(args.embedding_size, Y)
         xavier_uniform(self.U.weight)
 
         self.final = nn.Linear(args.embedding_size*2, Y)
