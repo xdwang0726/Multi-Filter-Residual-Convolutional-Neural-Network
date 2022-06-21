@@ -723,6 +723,8 @@ class DilatedCNN(nn.Module):
                                    nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=3, dilation=3),
                                    nn.SELU(), nn.AlphaDropout(p=0.05))
 
+        self.se = SE_Block(args.embedding_size)
+
         self.use_res = use_res
         if self.use_res:
             self.shortcut = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=1),
@@ -744,6 +746,7 @@ class DilatedCNN(nn.Module):
         x = self.word_rep(x, target)
         x = x.transpose(1, 2)  # (bs, emb_dim, seq_length)
         out = self.dconv(x)  # (bs, embed_dim, seq_len-ksz+1)
+        out = self.se(out)
 
         if self.use_res:
             out += self.shortcut(x)
