@@ -716,14 +716,14 @@ class DilatedCNN(nn.Module):
         super(DilatedCNN, self).__init__()
         self.word_rep = WordRep(args, Y, dicts)
 
-        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=1, dilation=1),
+        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=2, dilation=2),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
-                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=2, dilation=2),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=5, dilation=5),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
-                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=3, dilation=3),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=9, dilation=9),
                                    nn.SELU(), nn.AlphaDropout(p=0.05))
 
-        self.se = SE_Block(args.embedding_size)
+        # self.se = SE_Block(args.embedding_size)
 
         self.use_res = use_res
         if self.use_res:
@@ -746,7 +746,7 @@ class DilatedCNN(nn.Module):
         x = self.word_rep(x, target)
         x = x.transpose(1, 2)  # (bs, emb_dim, seq_length)
         out = self.dconv(x)  # (bs, embed_dim, seq_len-ksz+1)
-        out = self.se(out)
+        # out = self.se(out)
 
         if self.use_res:
             out += self.shortcut(x)
