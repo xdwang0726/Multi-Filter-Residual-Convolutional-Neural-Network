@@ -723,9 +723,9 @@ class DilatedCNN(nn.Module):
                                    nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=3, dilation=3),
                                    nn.SELU(), nn.AlphaDropout(p=0.05))
 
-        self.se = SE_Block(args.embedding_size)
+        # self.se = SE_Block(args.embedding_size)
 
-        # self.use_res = use_res
+        self.use_res = use_res
         if self.use_res:
             self.shortcut = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=1),
                                           nn.BatchNorm1d(args.embedding_size)
