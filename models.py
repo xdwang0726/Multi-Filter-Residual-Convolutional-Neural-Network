@@ -806,7 +806,7 @@ class RNN_DCNN(nn.Module):
         # self.U = nn.Linear(args.embedding_size, Y)
         # xavier_uniform(self.U.weight)
 
-        self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
+        # self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
         self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
 
         self.final = nn.Linear(args.embedding_size*2, Y)
@@ -817,9 +817,9 @@ class RNN_DCNN(nn.Module):
     def forward(self, x, x_length, target, mask, g, g_node_feature):
         rnn, state, conv = self.encoder(x, x_length, target)
 
-        label_feature = self.gcn(g, g_node_feature)
+        # label_feature = self.gcn(g, g_node_feature)
         # label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 100*2])
-        atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
+        atten_mask = g_node_feature.transpose(0, 1) * mask.unsqueeze(1)
 
         # alpha_rnn = F.softmax(self.U.weight.matmul(rnn.transpose(1, 2)), dim=2)
         # m_rnn = alpha_rnn.matmul(rnn)
