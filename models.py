@@ -742,18 +742,15 @@ class DilatedCNN(nn.Module):
     def forward(self, x, target, mask, g, g_node_feature):
 
         x = self.word_rep(x, target)
-        print('embedding', x.size())
         x = x.permute(0, 2, 1)  # (bs, emb_dim, seq_length)
         x = self.dconv(x)  # (bs, embed_dim, seq_len-ksz+1)
-        print('dilated x', x.size())
 
         if self.use_res:
-            print('shortcut', self.shortcut(x).size())
             x += self.shortcut(x)
         x = torch.tanh(x)
         x = self.dropout(x)
 
-        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
+        alpha = F.softmax(self.U.weight.matmul(x.transpose), dim=2)
         m = alpha.matmul(x)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
