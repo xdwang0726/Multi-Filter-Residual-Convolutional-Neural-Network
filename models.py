@@ -716,11 +716,11 @@ class DilatedCNN(nn.Module):
         super(DilatedCNN, self).__init__()
         self.word_rep = WordRep(args, Y, dicts)
 
-        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=(3-1) * 1, dilation=1),
+        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=1, dilation=1),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
-                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=(3-1) * 2, dilation=2),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=2, dilation=2),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
-                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=(3-1) * 3, dilation=3),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=3, dilation=3),
                                    nn.SELU(), nn.AlphaDropout(p=0.05))
 
         self.use_res = use_res
