@@ -753,6 +753,7 @@ class DilatedCNN(nn.Module):
         print('weight', self.U.weight.size())
 
         alpha = torch.softmax(torch.matmul(x.transpose(1, 2), self.U.weight.transpose(0, 1)), dim=1)
+        print('alpha', alpha.size())
         m = alpha.matmul(x)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
