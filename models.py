@@ -725,7 +725,7 @@ class DilatedCNN(nn.Module):
 
         self.use_res = use_res
         if self.use_res:
-            self.shortcut = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3),
+            self.shortcut = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=1),
                                           nn.BatchNorm1d(args.embedding_size)
                                           )
 
