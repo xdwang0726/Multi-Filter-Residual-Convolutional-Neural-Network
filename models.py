@@ -743,12 +743,9 @@ class DilatedCNN(nn.Module):
 
         x = self.word_rep(x, target)
         x = x.transpose(1, 2)  # (bs, emb_dim, seq_length)
-        print('embedding', x.size())
         out = self.dconv(x)  # (bs, embed_dim, seq_len-ksz+1)
-        print('conv', out.size())
 
         if self.use_res:
-            print('short', self.shortcut(x).size())
             out += self.shortcut(x)
         out = torch.tanh(out)
         out = self.dropout(out)
