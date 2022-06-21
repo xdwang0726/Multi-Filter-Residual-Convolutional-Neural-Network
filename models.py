@@ -716,11 +716,11 @@ class DilatedCNN(nn.Module):
         super(DilatedCNN, self).__init__()
         self.word_rep = WordRep(args, Y, dicts)
 
-        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=2, dilation=2),
+        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=1, dilation=1),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
-                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=5, dilation=5),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=2, dilation=2),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
-                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=9, dilation=9),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=3, dilation=3),
                                    nn.SELU(), nn.AlphaDropout(p=0.05))
 
         # self.se = SE_Block(args.embedding_size)
@@ -757,6 +757,9 @@ class DilatedCNN(nn.Module):
         # alpha = torch.softmax(torch.matmul(x.transpose(1, 2), self.U.weight.transpose(0, 1)), dim=1)
         alpha = F.softmax(self.U.weight.matmul(out.transpose(1, 2)), dim=2)
         m = alpha.matmul(out)
+
+        m = m.transpose(1, 2) * mask.unsqueeze(1)
+        m = m.transpose(1, 2)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
         loss = self.loss_function(y, target)
