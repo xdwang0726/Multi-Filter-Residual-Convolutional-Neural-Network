@@ -750,7 +750,7 @@ class DilatedCNN(nn.Module):
         x = torch.tanh(x)
         x = self.dropout(x)
 
-        alpha = F.softmax(self.U.weight.matmul(x.transpose), dim=2)
+        alpha = F.softmax(self.U.weight.matmul(x), dim=2)
         m = alpha.matmul(x)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
