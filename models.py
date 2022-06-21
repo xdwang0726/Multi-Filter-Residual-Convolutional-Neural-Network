@@ -752,7 +752,7 @@ class DilatedCNN(nn.Module):
         print('x', x.size())
         print('weight', self.U.weight.size())
 
-        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
+        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=1)
         m = alpha.matmul(x)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
