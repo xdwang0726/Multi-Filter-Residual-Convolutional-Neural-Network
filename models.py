@@ -734,7 +734,7 @@ class DilatedCNN(nn.Module):
         self.U = nn.Linear(args.embedding_size, Y)
         xavier_uniform(self.U.weight)
 
-        self.final = nn.Linear(args.embedding_size*2, Y)
+        self.final = nn.Linear(args.embedding_size, Y)
         xavier_uniform(self.final.weight)
 
         self.loss_function = nn.BCEWithLogitsLoss()
