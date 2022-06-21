@@ -739,7 +739,7 @@ class DilatedCNN(nn.Module):
 
         self.loss_function = nn.BCEWithLogitsLoss()
 
-    def forward(self, x, target):
+    def forward(self, x, target, mask):
 
         x = self.word_rep(x, target)
         x = x.permute(0, 2, 1)  # (bs, emb_dim, seq_length)
