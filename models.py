@@ -716,11 +716,11 @@ class DilatedCNN(nn.Module):
         super(DilatedCNN, self).__init__()
         self.word_rep = WordRep(args, Y, dicts)
 
-        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=1),
+        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=int(floor(3 / 2)), dilation=1),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
-                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=2),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=int(floor(3 / 2)), dilation=2),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
-                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=3),
+                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=int(floor(3 / 2)), dilation=3),
                                    nn.SELU(), nn.AlphaDropout(p=0.05))
 
         self.use_res = use_res
@@ -744,8 +744,10 @@ class DilatedCNN(nn.Module):
         x = self.word_rep(x, target)
         x = x.transpose(1, 2)  # (bs, emb_dim, seq_length)
         out = self.dconv(x)  # (bs, embed_dim, seq_len-ksz+1)
+        print('conv', out.size())
 
         if self.use_res:
+            print('short', self.shortcut(x).size())
             out += self.shortcut(x)
         out = torch.tanh(out)
         out = self.dropout(out)
