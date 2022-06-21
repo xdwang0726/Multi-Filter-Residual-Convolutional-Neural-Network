@@ -742,10 +742,13 @@ class DilatedCNN(nn.Module):
     def forward(self, x, target, mask, g, g_node_feature):
 
         x = self.word_rep(x, target)
+        print('embedding', x.size())
         x = x.permute(0, 2, 1)  # (bs, emb_dim, seq_length)
         x = self.dconv(x)  # (bs, embed_dim, seq_len-ksz+1)
+        print('dilated x', x.size())
 
         if self.use_res:
+            print('shortcut', self.shortcut(x).size())
             x += self.shortcut(x)
         x = torch.tanh(x)
         x = self.dropout(x)
