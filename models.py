@@ -712,23 +712,24 @@ class DCAN(nn.Module):
 
 
 class DilatedCNN(nn.Module):
-    def __init__(self, args, Y, dicts):
+    def __init__(self, args, Y, dicts, use_res=True):
         super(DilatedCNN, self).__init__()
         self.word_rep = WordRep(args, Y, dicts)
 
-        self.dconv1 = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=1),
+        self.dconv = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=1),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
                                    nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=2),
                                    nn.SELU(), nn.AlphaDropout(p=0.05),
                                    nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3, padding=0, dilation=3),
                                    nn.SELU(), nn.AlphaDropout(p=0.05))
 
-        self.dconv2 = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=5, padding=0, dilation=1),
-                                   nn.SELU(), nn.AlphaDropout(p=0.05),
-                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=5, padding=0, dilation=2),
-                                   nn.SELU(), nn.AlphaDropout(p=0.05),
-                                   nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=5, padding=0, dilation=3),
-                                   nn.SELU(), nn.AlphaDropout(p=0.05))
+        self.use_res = use_res
+        if self.use_res:
+            self.shortcut = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=3),
+                                          nn.BatchNorm1d(args.embedding_size)
+                                          )
+
+        self.dropout = nn.Dropout(p=args.dropout)
 
         self.U = nn.Linear(args.embedding_size, Y)
         xavier_uniform(self.U.weight)
@@ -742,16 +743,15 @@ class DilatedCNN(nn.Module):
 
         x = self.word_rep(x, target)
         x = x.permute(0, 2, 1)  # (bs, emb_dim, seq_length)
-        x1 = self.dconv1(x)  # (bs, embed_dim, seq_len-ksz+1)
-        x2 = self.dconv2(x)
-        print('x2', x2.size())
+        x = self.dconv(x)  # (bs, embed_dim, seq_len-ksz+1)
 
-        alpha1 = F.softmax(self.U.weight.matmul(x1.transpose(1, 2)), dim=2)
-        m1 = alpha1.matmul(x1)
-        alpha2 = F.softmax(self.U.weight.matmul(x2.transpose(1, 2)), dim=2)
-        m2 = alpha2.matmul(x2)
+        if self.use_res:
+            x += self.shortcut(x)
+        x = torch.tanh(x)
+        x = self.dropout(x)
 
-        m = torch.cat((m1, m2), dim=2)
+        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
+        m = alpha.matmul(x)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
         loss = self.loss_function(y, target)
