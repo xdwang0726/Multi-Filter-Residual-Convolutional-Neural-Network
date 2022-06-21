@@ -9,6 +9,100 @@ import codecs
 import re
 
 
+def text_clean(texts):
+    tokens = [t.lower() for t in tokenizer.tokenize(texts) if not t.isnumeric()]  # tokenize, lowercase and remove numerics
+    # tokens = [t.translate(table) for t in tokens]  # remove punctuation
+    # tokens = [t for t in tokens if t not in stop_words]  # remove stopwords
+    # tokens = [t for t in tokens if len(t) > 1]  # remove single character token
+    texts = ' '.join(tokens)
+    return texts
+
+
+def discharge_parser(summary):
+    """
+    INPUT: chunk of texts (str)
+    OUTPUT: {'section1': ..., 'section2': ..., ...}
+    """
+
+    key_list = ['hospital course', 'brief hospital course', 'brief summary of hospital course',
+                'concise summary of hospital course', 'additional hospital course', 'past medical history',
+                'history of present illness', 'history of the present illness:', 'discharge diagnosis',
+                'discharge diagnoses', 'final diagnoses', 'final diagnosis', 'final discharge diagnoses', 'diagnoses',
+                'diagnosis', 'primary', 'primary diagnoses', 'primary diagnosis', 'secondary', 'secondary diagnoses',
+                'secondary diagnosis']
+
+    hospital_course = ['hospital course', 'brief hospital course', 'brief summary of hospital course',
+                       'concise summary of hospital course']
+    past_history = ['past medical history']
+    present_illness = ['history of present illness', 'history of the present illness']
+    diagnosis = ['discharge diagnosis', 'discharge diagnoses', 'final diagnoses', 'final diagnosis', 'diagnoses',
+                 'diagnosis', 'primary', 'primary diagnoses', 'primary diagnosis', 'secondary', 'secondary diagnoses',
+                 'secondary diagnosis']
+
+    # remove the de-identified information
+    cleared_summary = re.sub("[\[]\*\*.*?\*\*[\]]", "", summary)
+    # find the sub-topic lists
+    sub_topic = re.findall('\n{2,}.*?\:', cleared_summary)
+    sub_topic = [t.strip() for t in sub_topic]
+    sub_topic = [t.lower().strip(':') for t in sub_topic if t[0].isalpha()]
+
+    topics = list(set(key_list).intersection(sub_topic))
+
+    cleared_summary = cleared_summary.lower()
+    summary = {key: None for key in topics}
+
+    for search in topics:
+        index = cleared_summary.find(search)
+
+        if index != -1:
+            topic_index = sub_topic.index(search)
+            # check if the last topic:
+            if topic_index == len(sub_topic) - 1:
+                text = cleared_summary[index:]
+            else:
+                second_index = cleared_summary.find(sub_topic[topic_index+1]+':')
+                text = cleared_summary[index:second_index]
+
+            text = re.sub('\n', ' ', text)
+            text = text.strip(search)
+            text = text_clean(text)
+            summary[search] = text.strip()
+
+    required_topics = ['hospital course', 'past medical history', 'history of present illness', 'diagnosis']
+    returned_summary = {key: None for key in required_topics}
+
+    for key, value in summary.items():
+        if key in hospital_course:
+            if returned_summary['hospital course'] is None:
+                returned_summary['hospital course'] = summary[key]
+            else:
+                summary[key] += ' '
+                returned_summary['hospital course'] += summary[key]
+        elif key in past_history:
+            if returned_summary['past medical history'] is None:
+                returned_summary['past medical history'] = summary[key]
+            else:
+                summary[key] += ' '
+                returned_summary['past medical history'] += summary[key]
+        elif key in present_illness:
+            if returned_summary['history of present illness'] is None:
+                returned_summary['history of present illness'] = summary[key]
+            else:
+                summary[key] += ' '
+                returned_summary['history of present illness'] += summary[key]
+        elif key in diagnosis:
+            if returned_summary['diagnosis'] is None:
+                returned_summary['diagnosis'] = summary[key]
+            else:
+                summary[key] += ' '
+                returned_summary['diagnosis'] += summary[key]
+
+    discharge_summary = [text for text in returned_summary.values() if text is not None]
+    discharge_summary = '\n\n'.join(discharge_summary)
+
+    return discharge_summary
+
+
 def gensim_to_embeddings(wv_file, vocab_file, Y, outfile=None):
     model = gensim.models.Word2Vec.load(wv_file)
     wv = model.wv
