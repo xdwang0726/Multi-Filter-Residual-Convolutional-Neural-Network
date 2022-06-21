@@ -742,22 +742,21 @@ class DilatedCNN(nn.Module):
     def forward(self, x, target, mask):
 
         x = self.word_rep(x, target)
-        x = x.permute(0, 2, 1)  # (bs, emb_dim, seq_length)
-        x = self.dconv(x)  # (bs, embed_dim, seq_len-ksz+1)
+        x = x.transpose(1, 2)  # (bs, emb_dim, seq_length)
+        out = self.dconv(x)  # (bs, embed_dim, seq_len-ksz+1)
 
         if self.use_res:
-            x += self.shortcut(x)
-        x = torch.tanh(x)
-        x = self.dropout(x)
-        x = x.transpose(1, 2)
+            out += self.shortcut(x)
+        out = torch.tanh(out)
+        out = self.dropout(out)
+        out = out.transpose(1, 2)
 
         # alpha = torch.softmax(torch.matmul(x.transpose(1, 2), self.U.weight.transpose(0, 1)), dim=1)
-        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
-        m = alpha.matmul(x)
+        alpha = F.softmax(self.U.weight.matmul(out.transpose(1, 2)), dim=2)
+        m = alpha.matmul(out)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
         loss = self.loss_function(y, target)
-        print(loss)
 
         return y, loss
 
