@@ -847,8 +847,8 @@ class MultiDilatedCNN(nn.Module):
         alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
         m = alpha.matmul(x)
 
-        m = m.transpose(1, 2) * mask.unsqueeze(1)
-        m = m.transpose(1, 2)
+        # m = m.transpose(1, 2) * mask.unsqueeze(1)
+        # m = m.transpose(1, 2)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
         loss = self.loss_function(y, target)
