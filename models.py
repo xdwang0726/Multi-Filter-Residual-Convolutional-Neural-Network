@@ -758,8 +758,8 @@ class DilatedCNN(nn.Module):
         alpha = F.softmax(self.U.weight.matmul(out.transpose(1, 2)), dim=2)
         m = alpha.matmul(out)
 
-        m = m.transpose(1, 2) * mask.unsqueeze(1)
-        m = m.transpose(1, 2)
+        # m = m.transpose(1, 2) * mask.unsqueeze(1)
+        # m = m.transpose(1, 2)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
         loss = self.loss_function(y, target)
@@ -956,7 +956,7 @@ def pick_model(args, dicts, num_class):
     elif args.model == 'MultiResCNN_atten':
         model = MultiResCNN_atten(args, num_class, dicts)
     elif args.model == 'DilatedCNN':
-        model = MultiDilatedCNN(args, num_class, dicts)
+        model = DilatedCNN(args, num_class, dicts)
     elif args.model == 'RNN_DCNN':
         model = RNN_DCNN(args, num_class, dicts)
     else:
