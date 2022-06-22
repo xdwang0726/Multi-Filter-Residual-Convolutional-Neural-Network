@@ -774,11 +774,17 @@ class DilatedCNN(nn.Module):
 class DilatedResidualBlock(nn.Module):
     def __init__(self, args, inchannel, outchannel, kernel_size, stride=1, use_res=True):
         super(DilatedResidualBlock, self).__init__()
-        self.left = nn.Sequential(nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, padding=1, dilation=1),
+        self.left = nn.Sequential(nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size,
+                                            padding=int(floor(args.dilated_rate[0]*(kernel_size-1) / 2)),
+                                            dilation=args.dilated_rate[0]),
                                   nn.SELU(), nn.AlphaDropout(p=0.05),
-                                  nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, padding=2, dilation=2),
+                                  nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size,
+                                            padding=int(floor(args.dilated_rate[1]*(kernel_size-1) / 2)),
+                                            dilation=args.dilated_rate[1]),
                                   nn.SELU(), nn.AlphaDropout(p=0.05),
-                                  nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, padding=3, dilation=3),
+                                  nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size,
+                                            padding=int(floor(args.dilated_rate[2]*(kernel_size-1) / 2)),
+                                            dilation=args.dilated_rate[2]),
                                   nn.SELU(), nn.AlphaDropout(p=0.05))
         # self.se = SE_Block(outchannel)
         self.use_res = use_res
@@ -956,7 +962,7 @@ def pick_model(args, dicts, num_class):
     elif args.model == 'MultiResCNN_atten':
         model = MultiResCNN_atten(args, num_class, dicts)
     elif args.model == 'DilatedCNN':
-        model = DilatedCNN(args, num_class, dicts)
+        model = MultiDilatedCNN(args, num_class, dicts)
     elif args.model == 'RNN_DCNN':
         model = RNN_DCNN(args, num_class, dicts)
     else:
