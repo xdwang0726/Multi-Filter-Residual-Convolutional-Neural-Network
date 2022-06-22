@@ -771,6 +771,73 @@ class DilatedCNN(nn.Module):
             p.requires_grad = False
 
 
+class MultiDilatedCNN(nn.Module):
+    def __init__(self, args, Y, dicts, use_res=True):
+        super(MultiDilatedCNN, self).__init__()
+        self.word_rep = WordRep(args, Y, dicts)
+
+        self.conv = nn.ModuleList()
+        filter_sizes = args.filter_size.split(',')
+        self.filter_num = len(filter_sizes)
+
+        for filter_size in filter_sizes:
+            filter_size = int(filter_size)
+            one_channel = nn.ModuleList()
+            tmp = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=filter_size, padding=1, dilation=1),
+                                nn.SELU(), nn.AlphaDropout(p=0.05),
+                                nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=filter_size, padding=2, dilation=2),
+                                nn.SELU(), nn.AlphaDropout(p=0.05),
+                                nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=filter_size, padding=3, dilation=3),
+                                nn.SELU(), nn.AlphaDropout(p=0.05))
+            one_channel.add_module('dconv', tmp)
+
+            tmp = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=1),
+                                nn.BatchNorm1d(args.embedding_size), nn.Dropout(args.dropout))
+            one_channel.add_module('resconv', tmp)
+
+            self.conv.add_module('channel-{}'.format(filter_size), one_channel)
+
+        # self.se = SE_Block(args.embedding_size)
+
+        self.U = nn.Linear(args.embedding_size, Y)
+        xavier_uniform(self.U.weight)
+
+        self.final = nn.Linear(args.embedding_size, Y)
+        xavier_uniform(self.final.weight)
+
+        self.loss_function = nn.BCEWithLogitsLoss()
+
+    def forward(self, x, target, mask):
+
+        x = self.word_rep(x, target)
+        x = x.transpose(1, 2)  # (bs, emb_dim, seq_length)
+
+        conv_result = []
+        for conv in self.conv:
+            tmp = x
+            for idx, md in enumerate(conv):
+                tmp = md(tmp)
+            tmp = tmp.transpose(1, 2)
+            conv_result.append(tmp)
+        x = torch.cat(conv_result, dim=2)
+
+        # alpha = torch.softmax(torch.matmul(x.transpose(1, 2), self.U.weight.transpose(0, 1)), dim=1)
+        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
+        m = alpha.matmul(x)
+
+        # m = m.transpose(1, 2) * mask.unsqueeze(1)
+        # m = m.transpose(1, 2)
+
+        y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
+        loss = self.loss_function(y, target)
+
+        return y, loss
+
+    def freeze_net(self):
+        for p in self.word_rep.embed.parameters():
+            p.requires_grad = False
+
+
 class rnn_encoder(nn.Module):
 
     def __init__(self, args, Y, dicts):
@@ -869,7 +936,7 @@ def pick_model(args, dicts, num_class):
     elif args.model == 'MultiResCNN_atten':
         model = MultiResCNN_atten(args, num_class, dicts)
     elif args.model == 'DilatedCNN':
-        model = DilatedCNN(args, num_class, dicts)
+        model = MultiDilatedCNN(args, num_class, dicts)
     elif args.model == 'RNN_DCNN':
         model = RNN_DCNN(args, num_class, dicts)
     else:
