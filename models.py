@@ -811,17 +811,19 @@ class MultiDilatedCNN(nn.Module):
 
         x = self.word_rep(x, target)
         x = x.transpose(1, 2)  # (bs, emb_dim, seq_length)
-
+        print('emb', x.size())
         conv_result = []
         for conv in self.conv:
             tmp = x
             for idx, md in enumerate(conv):
                 if idx == 0:
                     out = md(tmp)
+                    print('conv out', out.size())
                 else:
                     out += md(tmp)
-            out = out.transpose(1, 2)
+                    print('res', out.size())
             print('out', out.size())
+            out = out.transpose(1, 2)
             conv_result.append(out)
         x = torch.cat(conv_result, dim=2)
 
