@@ -828,9 +828,11 @@ class MultiDilatedCNN(nn.Module):
 
         x = self.word_rep(x, target)
         x = x.transpose(1, 2)  # (bs, emb_dim, seq_length)
-        print('emb', x.size())
+
         conv_result = []
+        print('num conv', len(self.conv))
         for conv in self.conv:
+            print('emb', x.size())
             out = conv(x)
             out = out.transpose(1, 2)
             print('out', out.size())
