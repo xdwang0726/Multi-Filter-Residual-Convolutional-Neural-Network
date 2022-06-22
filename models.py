@@ -822,10 +822,10 @@ class MultiDilatedCNN(nn.Module):
 
         # self.se = SE_Block(args.embedding_size)
 
-        self.U = nn.Linear(args.embedding_size, Y)
+        self.U = nn.Linear(args.embedding_size*self.filter_num, Y)
         xavier_uniform(self.U.weight)
 
-        self.final = nn.Linear(args.embedding_size, Y)
+        self.final = nn.Linear(args.embedding_size*self.filter_num, Y)
         xavier_uniform(self.final.weight)
 
         self.loss_function = nn.BCEWithLogitsLoss()
@@ -836,14 +836,10 @@ class MultiDilatedCNN(nn.Module):
         x = x.transpose(1, 2)  # (bs, emb_dim, seq_length)
 
         conv_result = []
-        print('num conv', len(self.conv))
         for conv in self.conv:
-            print('emb', x.size())
             out = conv(x)
             out = out.transpose(1, 2)
-            print('out', out.size())
-            conv_result.append(out)
-            print('length', len(conv_result))
+            conv_result.append(out) # size: (bs, seq_len, embed)
 
         x = torch.cat(conv_result, dim=2)
 
