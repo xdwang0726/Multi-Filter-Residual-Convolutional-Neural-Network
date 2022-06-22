@@ -817,6 +817,7 @@ class MultiDilatedCNN(nn.Module):
             tmp = x
             for idx, md in enumerate(conv):
                 tmp = md(tmp)
+                print('tmp', tmp.size())
             tmp = tmp.transpose(1, 2)
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
