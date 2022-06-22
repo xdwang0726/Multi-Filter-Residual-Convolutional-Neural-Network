@@ -816,10 +816,13 @@ class MultiDilatedCNN(nn.Module):
         for conv in self.conv:
             tmp = x
             for idx, md in enumerate(conv):
-                tmp = md(tmp)
-                print('tmp', tmp.size())
-            tmp = tmp.transpose(1, 2)
-            conv_result.append(tmp)
+                if idx == 0:
+                    out = md(tmp)
+                else:
+                    out += md(tmp)
+            out = out.transpose(1, 2)
+            print('out', out.size())
+            conv_result.append(out)
         x = torch.cat(conv_result, dim=2)
 
         # alpha = torch.softmax(torch.matmul(x.transpose(1, 2), self.U.weight.transpose(0, 1)), dim=1)
