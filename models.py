@@ -771,6 +771,35 @@ class DilatedCNN(nn.Module):
             p.requires_grad = False
 
 
+class DilatedResidualBlock(nn.Module):
+    def __init__(self, args, inchannel, outchannel, kernel_size, stride=1, use_res=True):
+        super(DilatedResidualBlock, self).__init__()
+        self.left = nn.Sequential(nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, padding=1, dilation=1),
+                                  nn.SELU(), nn.AlphaDropout(p=0.05),
+                                  nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, padding=2, dilation=2),
+                                  nn.SELU(), nn.AlphaDropout(p=0.05),
+                                  nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, padding=3, dilation=3),
+                                  nn.SELU(), nn.AlphaDropout(p=0.05))
+        # self.se = SE_Block(outchannel)
+        self.use_res = use_res
+        if self.use_res:
+            self.shortcut = nn.Sequential(
+                nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm1d(outchannel)
+            )
+
+        self.dropout = nn.Dropout(p=args.dropout)
+
+    def forward(self, x):
+        out = self.left(x)
+        # out = self.se(out)
+        if self.use_res:
+            out += self.shortcut(x)
+        out = torch.tanh(out)
+        out = self.dropout(out)
+        return out
+
+
 class MultiDilatedCNN(nn.Module):
     def __init__(self, args, Y, dicts, use_res=True):
         super(MultiDilatedCNN, self).__init__()
@@ -782,19 +811,7 @@ class MultiDilatedCNN(nn.Module):
 
         for filter_size in filter_sizes:
             filter_size = int(filter_size)
-            one_channel = nn.ModuleList()
-            tmp = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=filter_size, padding=1, dilation=1),
-                                nn.SELU(), nn.AlphaDropout(p=0.05),
-                                nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=filter_size, padding=2, dilation=2),
-                                nn.SELU(), nn.AlphaDropout(p=0.05),
-                                nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=filter_size, padding=3, dilation=3),
-                                nn.SELU(), nn.AlphaDropout(p=0.05))
-            one_channel.add_module('dconv', tmp)
-
-            tmp = nn.Sequential(nn.Conv1d(args.embedding_size, args.embedding_size, kernel_size=1),
-                                nn.BatchNorm1d(args.embedding_size), nn.Dropout(args.dropout))
-            one_channel.add_module('resconv', tmp)
-
+            one_channel = DilatedResidualBlock(args, args.embedding_size, args.embedding_size, filter_size)
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
         # self.se = SE_Block(args.embedding_size)
@@ -814,16 +831,9 @@ class MultiDilatedCNN(nn.Module):
         print('emb', x.size())
         conv_result = []
         for conv in self.conv:
-            tmp = x
-            for idx, md in enumerate(conv):
-                if idx == 0:
-                    out = md(tmp)
-                    print('conv out', out.size())
-                else:
-                    out += md(tmp)
-                    print('res', out.size())
-            print('out', out.size())
+            out = conv(x)
             out = out.transpose(1, 2)
+            print('out', out.size())
             conv_result.append(out)
         x = torch.cat(conv_result, dim=2)
 
