@@ -100,7 +100,7 @@ def test(args, mlb, model, data_path, fold, gpu, dicts, data_loader, G):
                 output, loss = model(inputs_id, labels, masks)
                 # output, loss = model(inputs_id, labels, masks, G, G.ndata['feat'])
 
-            output = torch.sigmoid(output)
+            # output = torch.sigmoid(output)
             output = output.data.cpu().numpy()
 
             losses.append(loss.item())
