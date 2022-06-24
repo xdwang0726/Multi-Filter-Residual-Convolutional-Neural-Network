@@ -857,7 +857,7 @@ class MultiDilatedCNN(nn.Module):
 
         m = m.transpose(1, 2) * mask.unsqueeze(2)
         print('m', m.size())
-        m = m.transpose(1, 2)
+        # m = m.transpose(1, 2)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
         loss = self.loss_function(y, target)
