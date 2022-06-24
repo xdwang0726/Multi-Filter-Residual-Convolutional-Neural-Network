@@ -855,8 +855,8 @@ class MultiDilatedCNN(nn.Module):
         m = torch.matmul(x.transpose(1, 2), alpha) # size (bs, embed*filter_sz, num_label)
         print('m', m.size())
 
-        m = m.transpose(1, 2) * mask.unsqueeze(1)
-        print('m', m.size())
+        m = m.transpose(1, 2) * mask.unsqueeze(2)
+        print('mask', mask.size())
         m = m.transpose(1, 2)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
