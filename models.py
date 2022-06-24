@@ -851,12 +851,9 @@ class MultiDilatedCNN(nn.Module):
 
         label_feature = self.gcn(g, g_node_feature) # (num_label, embed*filter_sz)
         alpha = torch.softmax(torch.matmul(x, label_feature.transpose(0, 1)), dim=1) # (bs, seq_len, num_label)
-        print('alpha', alpha.size())
         m = torch.matmul(x.transpose(1, 2), alpha) # size (bs, embed*filter_sz, num_label)
-        print('m', m.size())
 
         m = m.transpose(1, 2) * mask.unsqueeze(2)
-        print('m', m.size())
         # m = m.transpose(1, 2)
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
