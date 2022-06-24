@@ -844,17 +844,15 @@ class MultiDilatedCNN(nn.Module):
             conv_result.append(out) # size: (bs, seq_len, embed)
 
         x = torch.cat(conv_result, dim=2)
-        print('x', x.size())
 
         # alpha = torch.softmax(torch.matmul(x.transpose(1, 2), self.U.weight.transpose(0, 1)), dim=1)
         # alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
         # m = alpha.matmul(x)
 
         label_feature = self.gcn(g, g_node_feature) # (num_label, embed*filter_sz)
-        print('label', label_feature.size())
-        alpha = torch.softmax(torch.matmul(x.transpose(1, 2), label_feature.transpose(0, 1)), dim=1)
+        alpha = torch.softmax(torch.matmul(x.transpose, label_feature.transpose(0, 1)), dim=1) # (bs, seq_len, num_label)
         print('alpha', alpha.size())
-        m = torch.matmul(x, alpha)
+        m = torch.matmul(x.transpose(1, 2), alpha) # size (bs, embed*filter_sz, num_label)
         print('m', m.size())
 
         m = m.transpose(1, 2) * mask.unsqueeze(1)
