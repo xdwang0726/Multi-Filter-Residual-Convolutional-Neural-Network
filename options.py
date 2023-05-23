@@ -8,7 +8,7 @@ parser.add_argument('-MIMIC_3_DIR', type=str, default='./data/mimic3')
 parser.add_argument('-MIMIC_2_DIR', type=str, default='./data/mimic2')
 
 parser.add_argument("-data_path", type=str, default='./data/mimic3/train_full.csv')
-parser.add_argument("-icd_name_pair", type=str, default='./data/mimic3/mimic_icd.txt')
+parser.add_argument("-icd_name_pair", type=str, default='./data/mimic_icd.txt')
 parser.add_argument("-graph", type=str, default='./data/mimic3/gcn.bin')
 parser.add_argument("-vocab", type=str, default='./data/mimic3/vocab.csv')
 parser.add_argument("-Y", type=str, default='full', choices=['full', '50'])
