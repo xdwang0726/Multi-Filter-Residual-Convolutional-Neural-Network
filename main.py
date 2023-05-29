@@ -125,6 +125,7 @@ if __name__ == "__main__":
 
         if not test_only:
             epoch_start = time.time()
+
             losses = train(args, mlb, model, optimizer, epoch, args.gpu, train_loader, G, lr_scheduler)
             loss = np.mean(losses)
             epoch_finish = time.time()
