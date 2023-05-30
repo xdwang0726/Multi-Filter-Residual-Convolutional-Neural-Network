@@ -95,6 +95,35 @@ class SE_Block(nn.Module):
         return x * y.expand_as(x)
 
 
+class Projection(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(Projection, self).__init__()
+        self.projection = nn.Linear(in_channels, out_channels)
+
+    def forward(self, x):
+        # Reshape input tensor to (batch_size, in_channels, sequence_length) -> (batch_size, sequence_length, in_channels)
+        x = x.transpose(1, 2)
+        projected_x = self.projection(x)
+        projected_x = projected_x.transpose(1, 2)
+
+        return projected_x
+
+
+class LabelAttention(nn.Module):
+    def __init__(self):
+        super(LabelAttention, self).__init__()
+
+    def forward(self, hidden_states, label_feature):
+        """
+        hidden_states: (batch_size, sequence_length, hidden_size)
+        label_feature: (num_label, hidden_size)
+        """
+        attention_scores = torch.matmul(hidden_states, label_feature.transpose(0, 1))  # (batch_size, sequence_length, num_labels)
+        attention_weights = torch.softmax(attention_scores, dim=1)  # (batch_size, sequence_length, num_labels)
+        label_embeddings = torch.matmul(hidden_states.transpose(1, 2), attention_weights).transpose(1, 2)  # (batch_size, num_labels, hidden_size)
+        return label_embeddings
+
+
 class WordRep(nn.Module):
     def __init__(self, args, Y, dicts):
         super(WordRep, self).__init__()
@@ -160,7 +189,7 @@ class OutputLayer(nn.Module):
 
         self.loss_function = nn.BCEWithLogitsLoss()
 
-    def forward(self, x, target, mask):
+    def forward(self, x, target):
 
         alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
         # print('alpha', alpha.size())
@@ -168,8 +197,8 @@ class OutputLayer(nn.Module):
         # print('m', m.size())
         # print('mask', mask.size())
 
-        m = m.transpose(1, 2) * mask.unsqueeze(1)
-        m = m.transpose(1, 2)
+        # m = m.transpose(1, 2) * mask.unsqueeze(1)
+        # m = m.transpose(1, 2)
         # print('m', m.size())
         # alpha = torch.softmax(torch.matmul(x, mask), dim=1)
         # m = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)   # size: (bs, num_label, 50 * filter_num)
@@ -223,7 +252,7 @@ class CNN(nn.Module):
         filter_size = int(args.filter_size)
 
         self.conv = nn.Conv1d(self.word_rep.feature_size, args.num_filter_maps, kernel_size=filter_size,
-                                  padding=int(floor(filter_size / 2)))
+                              padding=int(floor(filter_size / 2)))
         xavier_uniform(self.conv.weight)
 
         self.output_layer = OutputLayer(args, Y, dicts, args.num_filter_maps)
@@ -379,13 +408,13 @@ class MultiResCNN(nn.Module):
             for idx in range(args.conv_layer):
                 tmp = ResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], filter_size, 1, True,
                                     args.dropout)
-                one_channel.add_module('se-resconv-{}'.format(idx), tmp)
+                one_channel.add_module('resconv-{}'.format(idx), tmp)
 
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
-    def forward(self, x, target, mask):
+    def forward(self, x, target):
 
         # x = self.word_rep(x, target, text_inputs)
         x = self.word_rep(x, target)
@@ -401,10 +430,12 @@ class MultiResCNN(nn.Module):
                 else:
                     tmp = md(tmp)
             tmp = tmp.transpose(1, 2)
+            print('tmp', tmp.size())
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
+        print("x", x.size())
 
-        y, loss = self.output_layer(x, target, mask)
+        y, loss = self.output_layer(x, target)
 
         return y, loss
 
@@ -413,10 +444,10 @@ class MultiResCNN(nn.Module):
             p.requires_grad = False
 
 
-class MultiResCNN_atten(nn.Module):
+class MultiResCNN_label_atten(nn.Module):
 
     def __init__(self, args, Y, dicts, cornet_dim=1000, n_cornet_blocks=2):
-        super(MultiResCNN_atten, self).__init__()
+        super(MultiResCNN_label_atten, self).__init__()
 
         self.word_rep = WordRep(args, Y, dicts)
 
@@ -436,12 +467,18 @@ class MultiResCNN_atten(nn.Module):
             for idx in range(args.conv_layer):
                 tmp = ResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], filter_size, 1, True,
                                     args.dropout)
-                one_channel.add_module('se-resconv-{}'.format(idx), tmp)
+                one_channel.add_module('resconv-{}'.format(idx), tmp)
 
             self.conv.add_module('channel-{}'.format(filter_size), one_channel)
 
         # label graph
-        # self.gcn = LabelNet(256, self.filter_num * args.num_filter_maps, args.embedding_size)
+        self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
+
+        # projectino layer
+        self.projection = Projection()
+
+        # label-wise attention
+        self.label_attention = LabelAttention()
 
         # self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
@@ -453,8 +490,8 @@ class MultiResCNN_atten(nn.Module):
         self.loss_function = nn.BCEWithLogitsLoss()
 
     def forward(self, x, target, mask, g, g_node_feature):
-        # label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
-        # label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
+        label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
+        label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
 
         # atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
         # print('mask', atten_mask.size())
@@ -476,6 +513,9 @@ class MultiResCNN_atten(nn.Module):
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
         # print('x', x.size())
+
+        # label-wise attention
+
 
         y = self.output_layer(x, target, mask)
         y = self.cornet(y)

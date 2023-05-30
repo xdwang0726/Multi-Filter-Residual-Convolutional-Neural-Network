@@ -17,7 +17,7 @@ parser.add_argument("-MAX_LENGTH", type=int, default=2500)
 
 # model
 parser.add_argument("-model", type=str, choices=['CNN', 'MultiCNN', 'ResCNN', 'DilatedCNN', 'MultiResCNN', 'MultiResCNN_GCN', 'MultiSeResCNN_GCN', 'RNN_GCN', 'DCAN', 'MultiResCNN_atten', 'RNN_DCNN'], default='MultiSeResCNN_GCN')
-parser.add_argument("-filter_size", type=str, default="3, 5, 9, 15")
+parser.add_argument("-filter_size", type=str, default="3, 5, 9, 15, 19, 25")
 parser.add_argument("-dilated_rate", type=list, default=[1, 2, 3])
 parser.add_argument("-embedding_size", type=int, default=100)
 parser.add_argument("-num_filter_maps", type=int, default=50)
