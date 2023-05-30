@@ -553,9 +553,6 @@ class MultiResCNNMaskedLabelAtten(nn.Module):
         # projectino layer
         self.projection = Projection(self.filter_num * args.num_filter_maps, args.embedding_size*2)
 
-        # label-wise attention
-        self.label_attention = LabelAttention()
-
         # corNet
         self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
 
