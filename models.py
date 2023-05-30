@@ -101,10 +101,8 @@ class Projection(nn.Module):
         self.projection = nn.Linear(in_channels, out_channels)
 
     def forward(self, x):
-        # Reshape input tensor to (batch_size, in_channels, sequence_length) -> (batch_size, sequence_length, in_channels)
-        x = x.transpose(1, 2)
+        # (batch_size, sequence_length, in_channels)
         projected_x = self.projection(x)
-        projected_x = projected_x.transpose(1, 2)
 
         return projected_x
 
@@ -475,13 +473,10 @@ class MultiResCNN_label_atten(nn.Module):
         self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
 
         # projectino layer
-        self.projection = Projection()
+        self.projection = Projection(self.filter_num * args.num_filter_maps, args.embedding_size*2)
 
         # label-wise attention
         self.label_attention = LabelAttention()
-
-        # self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
-        self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
         # corNet
         self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
@@ -493,10 +488,6 @@ class MultiResCNN_label_atten(nn.Module):
         label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
         label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
 
-        # atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
-        # print('mask', atten_mask.size())
-
-        # x = self.word_rep(x, target, text_inputs)
         x = self.word_rep(x, target)
 
         x = x.transpose(1, 2)
@@ -511,14 +502,19 @@ class MultiResCNN_label_atten(nn.Module):
                     tmp = md(tmp)
             tmp = tmp.transpose(1, 2)
             conv_result.append(tmp)
-        x = torch.cat(conv_result, dim=2)
-        # print('x', x.size())
+        x = torch.cat(conv_result, dim=2) # (bs, seq_len, num_filter * num_filter_maps)
+        print('x', x.size())
+
+        x = self.projection(x)
 
         # label-wise attention
+        weighted_labels = self.label_attention(x, label_feature)  # (bs, num_label, embedding_sz*2)
+        print('weighted_labels', weighted_labels.size())
 
-
-        y = self.output_layer(x, target, mask)
+        y = torch.sum(weighted_labels * label_feature, dim=2)
+        print('y', y.size())
         y = self.cornet(y)
+
         loss = self.loss_function(y, target)
 
         return y, loss
@@ -1001,8 +997,8 @@ def pick_model(args, dicts, num_class):
         model = RNN_GCN(args, num_class, dicts, num_class)
     elif args.model == 'DCAN':
         model = DCAN(args, num_class, dicts)
-    elif args.model == 'MultiResCNN_atten':
-        model = MultiResCNN_atten(args, num_class, dicts)
+    elif args.model == 'MultiResCNNLabelAtten':
+        model = MultiResCNN_label_atten(args, num_class, dicts)
     elif args.model == 'DilatedCNN':
         model = MultiDilatedCNN(args, num_class, dicts)
     elif args.model == 'RNN_DCNN':
