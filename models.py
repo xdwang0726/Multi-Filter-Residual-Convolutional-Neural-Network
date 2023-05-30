@@ -431,7 +431,6 @@ class MultiResCNN(nn.Module):
             print('tmp', tmp.size())
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
-        print("x", x.size())
 
         y, loss = self.output_layer(x, target)
 
@@ -503,16 +502,13 @@ class MultiResCNNLabelAtten(nn.Module):
             tmp = tmp.transpose(1, 2)
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2) # (bs, seq_len, num_filter * num_filter_maps)
-        print('x', x.size())
 
         x = self.projection(x)
 
         # label-wise attention
         weighted_labels = self.label_attention(x, label_feature)  # (bs, num_label, embedding_sz*2)
-        print('weighted_labels', weighted_labels.size())
 
         y = torch.sum(weighted_labels * label_feature, dim=2)
-        print('y', y.size())
         y = self.cornet(y)
 
         loss = self.loss_function(y, target)
@@ -569,6 +565,7 @@ class MultiResCNNMaskedLabelAtten(nn.Module):
     def forward(self, x, target, mask, g, g_node_feature):
         label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
         label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
+        print('mask', mask.size())
 
         x = self.word_rep(x, target)
 
