@@ -42,6 +42,7 @@ if __name__ == "__main__":
 
     print('Load graph')
     G = dgl.load_graphs(args.graph)[0][0]
+    G.ndata['feat'] = G.ndata['feat'].to(torch.float32)
     print('graph', G.ndata['feat'].shape)
 
     csv.field_size_limit(sys.maxsize)
