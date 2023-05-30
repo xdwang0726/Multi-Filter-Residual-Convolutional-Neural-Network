@@ -442,10 +442,10 @@ class MultiResCNN(nn.Module):
             p.requires_grad = False
 
 
-class MultiResCNN_label_atten(nn.Module):
+class MultiResCNNLabelAtten(nn.Module):
 
     def __init__(self, args, Y, dicts, cornet_dim=1000, n_cornet_blocks=2):
-        super(MultiResCNN_label_atten, self).__init__()
+        super(MultiResCNNLabelAtten, self).__init__()
 
         self.word_rep = WordRep(args, Y, dicts)
 
@@ -509,6 +509,91 @@ class MultiResCNN_label_atten(nn.Module):
 
         # label-wise attention
         weighted_labels = self.label_attention(x, label_feature)  # (bs, num_label, embedding_sz*2)
+        print('weighted_labels', weighted_labels.size())
+
+        y = torch.sum(weighted_labels * label_feature, dim=2)
+        print('y', y.size())
+        y = self.cornet(y)
+
+        loss = self.loss_function(y, target)
+
+        return y, loss
+
+    def freeze_net(self):
+        for p in self.word_rep.embed.parameters():
+            p.requires_grad = False
+
+
+class MultiResCNNMaskedLabelAtten(nn.Module):
+
+    def __init__(self, args, Y, dicts, cornet_dim=1000, n_cornet_blocks=2):
+        super(MultiResCNNMaskedLabelAtten, self).__init__()
+
+        self.word_rep = WordRep(args, Y, dicts)
+
+        self.conv = nn.ModuleList()
+        filter_sizes = args.filter_size.split(',')
+
+        self.filter_num = len(filter_sizes)
+        for filter_size in filter_sizes:
+            filter_size = int(filter_size)
+            one_channel = nn.ModuleList()
+            tmp = nn.Conv1d(self.word_rep.feature_size, self.word_rep.feature_size, kernel_size=filter_size,
+                            padding=int(floor(filter_size / 2)))
+            xavier_uniform(tmp.weight)
+            one_channel.add_module('baseconv', tmp)
+
+            conv_dimension = self.word_rep.conv_dict[args.conv_layer]
+            for idx in range(args.conv_layer):
+                tmp = ResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], filter_size, 1, True,
+                                    args.dropout)
+                one_channel.add_module('resconv-{}'.format(idx), tmp)
+
+            self.conv.add_module('channel-{}'.format(filter_size), one_channel)
+
+        # label graph
+        self.gcn = LabelNet(args.embedding_size, args.embedding_size, args.embedding_size)
+
+        # projectino layer
+        self.projection = Projection(self.filter_num * args.num_filter_maps, args.embedding_size*2)
+
+        # label-wise attention
+        self.label_attention = LabelAttention()
+
+        # corNet
+        self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
+
+        # loss
+        self.loss_function = nn.BCEWithLogitsLoss()
+
+    def forward(self, x, target, mask, g, g_node_feature):
+        label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
+        label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
+
+        x = self.word_rep(x, target)
+
+        x = x.transpose(1, 2)
+
+        conv_result = []
+        for conv in self.conv:
+            tmp = x
+            for idx, md in enumerate(conv):
+                if idx == 0:
+                    tmp = torch.tanh(md(tmp))
+                else:
+                    tmp = md(tmp)
+            tmp = tmp.transpose(1, 2)
+            conv_result.append(tmp)
+        x = torch.cat(conv_result, dim=2) # (bs, seq_len, num_filter * num_filter_maps)
+        print('x', x.size())
+
+        x = self.projection(x)
+
+        # masked-label-wise attention
+        atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
+        atten_mask = atten_mask.transpose(0, 1)
+        print("atten_mask", atten_mask.size())
+        weighted_labels = self.label_attention(x, atten_mask)  # (bs, num_label, embedding_sz*2)
         print('weighted_labels', weighted_labels.size())
 
         y = torch.sum(weighted_labels * label_feature, dim=2)
@@ -998,7 +1083,9 @@ def pick_model(args, dicts, num_class):
     elif args.model == 'DCAN':
         model = DCAN(args, num_class, dicts)
     elif args.model == 'MultiResCNNLabelAtten':
-        model = MultiResCNN_label_atten(args, num_class, dicts)
+        model = MultiResCNNLabelAtten(args, num_class, dicts)
+    elif args.model == 'MultiResCNNMaskedLabelAtten':
+        model = MultiResCNNMaskedLabelAtten(args, num_class, dicts)
     elif args.model == 'DilatedCNN':
         model = MultiDilatedCNN(args, num_class, dicts)
     elif args.model == 'RNN_DCNN':
