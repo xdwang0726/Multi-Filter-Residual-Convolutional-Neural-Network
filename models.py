@@ -562,7 +562,6 @@ class MultiResCNNMaskedLabelAtten(nn.Module):
     def forward(self, x, target, mask, g, g_node_feature):
         label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
         label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 200])
-        print('mask', mask.size())
 
         x = self.word_rep(x, target)
 
@@ -579,115 +578,17 @@ class MultiResCNNMaskedLabelAtten(nn.Module):
             tmp = tmp.transpose(1, 2)
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2) # (bs, seq_len, num_filter * num_filter_maps)
-        print('x', x.size())
 
         x = self.projection(x)
 
         # masked-label-wise attention
         atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
-        print("atten_mask", atten_mask.size())
         alpha = torch.softmax(torch.matmul(x, atten_mask), dim=1)
         weighted_labels = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)  # size: (bs, num_label, embed_dim*2)
-        print('weighted_labels', weighted_labels.size())
 
         y = torch.sum(weighted_labels * label_feature, dim=2)
-        print('y', y.size())
         y = self.cornet(y)
 
-        loss = self.loss_function(y, target)
-
-        return y, loss
-
-    def freeze_net(self):
-        for p in self.word_rep.embed.parameters():
-            p.requires_grad = False
-
-
-class MultiResCNN_GCN(nn.Module):
-    def __init__(self, args, Y, dicts, num_class, cornet_dim=1000, n_cornet_blocks=2):
-        super(MultiResCNN_GCN, self).__init__()
-
-        self.word_rep = WordRep(args, Y, dicts)
-
-        self.conv = nn.ModuleList()
-        filter_sizes = args.filter_size.split(',')
-
-        self.filter_num = len(filter_sizes)
-        for filter_size in filter_sizes:
-            filter_size = int(filter_size)
-            one_channel = nn.ModuleList()
-            tmp = nn.Conv1d(self.word_rep.feature_size, self.word_rep.feature_size, kernel_size=filter_size,
-                            padding=int(floor(filter_size / 2)))
-            xavier_uniform(tmp.weight)
-            one_channel.add_module('baseconv', tmp)
-
-            conv_dimension = self.word_rep.conv_dict[args.conv_layer]
-            for idx in range(args.conv_layer):
-                tmp = ResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], filter_size, 1, True, args.dropout)
-                one_channel.add_module('resconv-{}'.format(idx), tmp)
-
-            self.conv.add_module('channel-{}'.format(filter_size), one_channel)
-
-        # self.U = nn.Linear(args.num_filter_maps * self.filter_num, args.embedding_size*2)
-        # nn.init.xavier_uniform_(self.U.weight)
-        self.U = nn.Linear(args.num_filter_maps * self.filter_num, Y)
-        xavier_uniform(self.U.weight)
-
-        # label graph
-        self.gcn = LabelNet(256, args.embedding_size*2, args.embedding_size)
-
-        # corNet
-        self.cornet = CorNet(num_class, cornet_dim, n_cornet_blocks)
-
-        self.output_layer = OutputLayer(args, num_class, dicts, self.filter_num * args.num_filter_maps)
-
-        # loss
-        self.loss_function = nn.BCEWithLogitsLoss()
-
-    def forward(self, x, target, mask, g, g_node_feature):
-
-        label_feature = self.gcn(g, g_node_feature)  # size: (bs, num_label, 100)
-
-        label_feature = torch.cat((label_feature, g_node_feature), dim=1)  # torch.Size([num_label, 300])
-
-
-        # atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
-        # atten_mask = g_node_feature.transpose(0, 1) * mask.unsqueeze(1)
-        # print('mask', atten_mask.size())
-
-        x = self.word_rep(x, target)
-        x = x.transpose(1, 2)
-
-        conv_result = []
-        for conv in self.conv:
-            tmp = x
-            for idx, md in enumerate(conv):
-                if idx == 0:
-                    tmp = torch.tanh(md(tmp))
-                else:
-                    tmp = md(tmp)
-            tmp = tmp.transpose(1, 2)
-            # atten = torch.softmax(torch.matmul(tmp, atten_mask), dim=1)
-            # atten_tmp = torch.matmul(tmp.transpose(1, 2), atten).transpose(1, 2)
-            conv_result.append(tmp)
-        x = torch.cat(conv_result, dim=2)  # size: (bs, num_label, 50 * len(ksz_list))
-
-        alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
-        m = alpha.matmul(x) # [bs, Y, dim]
-        m = m.transpose(1, 2) * mask.unsqueeze(1)
-        m = m.transpose(1, 2)  # size: (bs, num_label, 50 * len(ksz_list))
-
-        # x = self.U(x)
-        # print('x', x.size())
-        # atten = torch.softmax(torch.matmul(x, atten_mask), dim=1)
-        # atten_x = torch.matmul(x.transpose(1, 2), atten).transpose(1, 2)
-
-        # feature = torch.sum(x * label_feature, dim=2)
-        y = torch.sum(m * label_feature, dim=2)
-        y = self.cornet(y)
-        #
-        # y = self.output_layer(x, target)
-        y = self.cornet(y)
         loss = self.loss_function(y, target)
 
         return y, loss
@@ -722,7 +623,6 @@ class RNN_GCN(nn.Module):
         atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
 
         x = self.word_rep(x, target)
-        # x = x.transpose(1, 2)
         x = pack_padded_sequence(x, x_length, batch_first=True, enforce_sorted=False)  # packed input title
         x, (_,_) = self.rnn(x)
         x, _ = pad_packed_sequence(x, batch_first=True)
@@ -921,6 +821,34 @@ class DilatedResidualBlock(nn.Module):
         return out
 
 
+class DilatedResidualCNN(nn.Module):
+    def __init__(self, in_channels, num_classes):
+        super(DilatedResidualCNN, self).__init__()
+
+        self.conv1 = nn.Conv1d(in_channels, 64, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+
+        self.residual_block1 = ResidualBlock(64, 64, kernel_size=3, dilation=1)
+        self.residual_block2 = ResidualBlock(64, 64, kernel_size=3, dilation=2)
+        self.residual_block3 = ResidualBlock(64, 64, kernel_size=3, dilation=4)
+
+        self.pool = nn.AdaptiveAvgPool1d(1)
+        self.fc = nn.Linear(64, num_classes)
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.relu(out)
+
+        out = self.residual_block1(out)
+        out = self.residual_block2(out)
+        out = self.residual_block3(out)
+
+        out = self.pool(out).squeeze(2)
+        out = self.fc(out)
+
+        return out
+
+
 class MultiDilatedCNN(nn.Module):
     def __init__(self, args, Y, dicts, use_res=True):
         super(MultiDilatedCNN, self).__init__()
@@ -1068,10 +996,6 @@ def pick_model(args, dicts, num_class):
         model = ResCNN(args, num_class, dicts)
     elif args.model == 'MultiResCNN':
         model = MultiResCNN(args, num_class, dicts)
-    elif args.model == 'MultiResCNN_GCN':
-        model = MultiResCNN_GCN(args, num_class, dicts, num_class)
-    elif args.model == 'MultiSeResCNN_GCN':
-        model = MultiResCNN_GCN(args, num_class, dicts, num_class)
     elif args.model == 'RNN_GCN':
         model = RNN_GCN(args, num_class, dicts, num_class)
     elif args.model == 'DCAN':
