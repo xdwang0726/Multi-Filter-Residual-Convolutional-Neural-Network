@@ -588,9 +588,9 @@ class MultiResCNNMaskedLabelAtten(nn.Module):
 
         # masked-label-wise attention
         atten_mask = label_feature.transpose(0, 1) * mask.unsqueeze(1)
-        atten_mask = atten_mask.transpose(0, 1)
         print("atten_mask", atten_mask.size())
-        weighted_labels = self.label_attention(x, atten_mask)  # (bs, num_label, embedding_sz*2)
+        alpha = torch.softmax(torch.matmul(x, atten_mask), dim=1)
+        weighted_labels = torch.matmul(x.transpose(1, 2), alpha).transpose(1, 2)  # size: (bs, num_label, embed_dim*2)
         print('weighted_labels', weighted_labels.size())
 
         y = torch.sum(weighted_labels * label_feature, dim=2)
