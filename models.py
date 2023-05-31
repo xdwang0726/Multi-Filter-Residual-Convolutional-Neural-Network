@@ -794,30 +794,60 @@ class DilatedCNN(nn.Module):
             p.requires_grad = False
 
 
+# class DilatedResidualBlock(nn.Module):
+#     def __init__(self, args, inchannel, outchannel, kernel_size, stride=1, use_res=True):
+#         super(DilatedResidualBlock, self).__init__()
+#         self.left = nn.Sequential(nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size,
+#                                             padding=int(floor(args.dilated_rate[0]*(kernel_size-1) / 2)),
+#                                             dilation=args.dilated_rate[0]),
+#                                   nn.SELU(), nn.AlphaDropout(p=0.05),
+#                                   nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size,
+#                                             padding=int(floor(args.dilated_rate[1]*(kernel_size-1) / 2)),
+#                                             dilation=args.dilated_rate[1]),
+#                                   nn.SELU(), nn.AlphaDropout(p=0.05),
+#                                   nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size,
+#                                             padding=int(floor(args.dilated_rate[2]*(kernel_size-1) / 2)),
+#                                             dilation=args.dilated_rate[2]),
+#                                   nn.SELU(), nn.AlphaDropout(p=0.05))
+#         # self.se = SE_Block(outchannel)
+#         self.use_res = use_res
+#         if self.use_res:
+#             self.shortcut = nn.Sequential(
+#                 nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, bias=False),
+#                 nn.BatchNorm1d(outchannel)
+#             )
+#
+#         self.dropout = nn.Dropout(p=args.dropout)
+#
+#     def forward(self, x):
+#         out = self.left(x)
+#         # out = self.se(out)
+#         if self.use_res:
+#             out += self.shortcut(x)
+#         out = torch.tanh(out)
+#         out = self.dropout(out)
+#         return out
+
+
 class DilatedResidualBlock(nn.Module):
-    def __init__(self, args, inchannel, outchannel, kernel_size, stride=1, use_res=True):
-        super(DilatedResidualBlock, self).__init__()
-        self.left = nn.Sequential(nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size,
-                                            padding=int(floor(args.dilated_rate[0]*(kernel_size-1) / 2)),
-                                            dilation=args.dilated_rate[0]),
-                                  nn.SELU(), nn.AlphaDropout(p=0.05),
-                                  nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size,
-                                            padding=int(floor(args.dilated_rate[1]*(kernel_size-1) / 2)),
-                                            dilation=args.dilated_rate[1]),
-                                  nn.SELU(), nn.AlphaDropout(p=0.05),
-                                  nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size,
-                                            padding=int(floor(args.dilated_rate[2]*(kernel_size-1) / 2)),
-                                            dilation=args.dilated_rate[2]),
-                                  nn.SELU(), nn.AlphaDropout(p=0.05))
+    def __init__(self, inchannel, outchannel, kernel_size, stride, use_res, dropout, dilation_rate):
+        super(ResidualBlock, self).__init__()
+        self.left = nn.Sequential(
+            nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding=int(floor(kernel_size / 2)), bias=False, dilation=dilation_rate),
+            nn.BatchNorm1d(outchannel),
+            nn.Tanh(),
+            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(kernel_size / 2)), bias=False, dilation=dilation_rate),
+            nn.BatchNorm1d(outchannel)
+        )
         # self.se = SE_Block(outchannel)
         self.use_res = use_res
         if self.use_res:
             self.shortcut = nn.Sequential(
-                nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm1d(outchannel)
-            )
+                        nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, bias=False, dilation=dilation_rate),
+                        nn.BatchNorm1d(outchannel)
+                    )
 
-        self.dropout = nn.Dropout(p=args.dropout)
+        self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):
         out = self.left(x)
@@ -829,33 +859,71 @@ class DilatedResidualBlock(nn.Module):
         return out
 
 
-class DilatedResidualCNN(nn.Module):
-    def __init__(self, in_channels, num_classes):
-        super(DilatedResidualCNN, self).__init__()
+class MultiLevelDilatedResCNN(nn.Module):
 
-        self.conv1 = nn.Conv1d(in_channels, 64, kernel_size=3, padding=1)
-        self.relu = nn.ReLU()
+    def __init__(self, args, Y, dicts, cornet_dim=1000, n_cornet_blocks=2):
+        super(MultiLevelDilatedResCNN, self).__init__()
 
-        self.residual_block1 = ResidualBlock(64, 64, kernel_size=3, dilation=1)
-        self.residual_block2 = ResidualBlock(64, 64, kernel_size=3, dilation=2)
-        self.residual_block3 = ResidualBlock(64, 64, kernel_size=3, dilation=4)
+        self.word_rep = WordRep(args, Y, dicts)
 
-        self.pool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Linear(64, num_classes)
+        self.conv = nn.ModuleList()
+        dilation_rates = args.dilation_rates.split(',')
 
-    def forward(self, x):
-        out = self.conv1(x)
-        out = self.relu(out)
+        self.filter_num = len(dilation_rates)
+        for dilation_rate in dilation_rates:
+            dilation_rate = int(dilation_rate)
+            one_channel = nn.ModuleList()
+            tmp = nn.Conv1d(self.word_rep.feature_size, self.word_rep.feature_size, kernel_size=args.kernel_size,
+                            padding=int(floor(args.kernel_size / 2)), dilation=dilation_rate)
+            xavier_uniform(tmp.weight)
+            one_channel.add_module('baseconv', tmp)
 
-        out = self.residual_block1(out)
-        out = self.residual_block2(out)
-        out = self.residual_block3(out)
+            conv_dimension = self.word_rep.conv_dict[args.conv_layer]
+            for idx in range(args.conv_layer):
+                tmp = ResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], args.kernel_size, 1, True,
+                                    args.dropout, dilation_rate)
+                one_channel.add_module('resconv-{}'.format(idx), tmp)
 
-        out = self.pool(out).squeeze(2)
-        out = self.fc(out)
+            self.conv.add_module('channel-{}'.format(dilation_rate), one_channel)
 
-        return out
+        self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
+        # corNet
+        self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
+
+        self.loss_function = nn.BCEWithLogitsLoss()
+
+    def forward(self, x, target):
+
+        # x = self.word_rep(x, target, text_inputs)
+        x = self.word_rep(x, target)
+
+        x = x.transpose(1, 2)
+
+        conv_result = []
+        for conv in self.conv:
+            tmp = x
+            for idx, md in enumerate(conv):
+                if idx == 0:
+                    tmp = torch.tanh(md(tmp))
+                else:
+                    tmp = md(tmp)
+            tmp = tmp.transpose(1, 2)
+            print('tmp', tmp.size())
+            conv_result.append(tmp)
+        x = torch.cat(conv_result, dim=2)
+        print("x", x.size())
+
+        y = self.output_layer(x)
+        y = self.cornet(y)
+
+        loss = self.loss_function(y, target)
+
+        return y, loss
+
+    def freeze_net(self):
+        for p in self.word_rep.embed.parameters():
+            p.requires_grad = False
 
 class MultiDilatedCNN(nn.Module):
     def __init__(self, args, Y, dicts, use_res=True):
@@ -1013,7 +1081,7 @@ def pick_model(args, dicts, num_class):
     elif args.model == 'MultiResCNNMaskedLabelAtten':
         model = MultiResCNNMaskedLabelAtten(args, num_class, dicts)
     elif args.model == 'DilatedCNN':
-        model = MultiDilatedCNN(args, num_class, dicts)
+        model = MultiLevelDilatedResCNN(args, num_class, dicts)
     elif args.model == 'RNN_DCNN':
         model = RNN_DCNN(args, num_class, dicts)
     else:
