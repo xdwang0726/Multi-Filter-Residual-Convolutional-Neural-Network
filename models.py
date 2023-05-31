@@ -185,9 +185,9 @@ class OutputLayer(nn.Module):
         self.final = nn.Linear(input_size, Y)
         xavier_uniform(self.final.weight)
 
-        self.loss_function = nn.BCEWithLogitsLoss()
+        # self.loss_function = nn.BCEWithLogitsLoss()
 
-    def forward(self, x, target):
+    def forward(self, x):
 
         alpha = F.softmax(self.U.weight.matmul(x.transpose(1, 2)), dim=2)
         # print('alpha', alpha.size())
@@ -203,8 +203,8 @@ class OutputLayer(nn.Module):
 
         y = self.final.weight.mul(m).sum(dim=2).add(self.final.bias)
 
-        loss = self.loss_function(y, target)
-        return y, loss
+        #
+        return y
         # return y
 
 
@@ -385,7 +385,7 @@ class ResCNN(nn.Module):
 
 class MultiResCNN(nn.Module):
 
-    def __init__(self, args, Y, dicts):
+    def __init__(self, args, Y, dicts, cornet_dim=1000, n_cornet_blocks=2):
         super(MultiResCNN, self).__init__()
 
         self.word_rep = WordRep(args, Y, dicts)
@@ -412,6 +412,11 @@ class MultiResCNN(nn.Module):
 
         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
 
+        # corNet
+        self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
+
+        self.loss_function = nn.BCEWithLogitsLoss()
+
     def forward(self, x, target):
 
         # x = self.word_rep(x, target, text_inputs)
@@ -428,11 +433,14 @@ class MultiResCNN(nn.Module):
                 else:
                     tmp = md(tmp)
             tmp = tmp.transpose(1, 2)
-            print('tmp', tmp.size())
+            # print('tmp', tmp.size())
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
 
-        y, loss = self.output_layer(x, target)
+        y = self.output_layer(x)
+        y = self.cornet(y)
+
+        loss = self.loss_function(y, target)
 
         return y, loss
 
