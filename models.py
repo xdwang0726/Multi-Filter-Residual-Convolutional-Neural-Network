@@ -852,10 +852,10 @@ class DilatedResidualBlock(nn.Module):
 
     def forward(self, x):
         out = self.left(x)
-        print('out', out.size())
+        # print('out', out.size())
         # out = self.se(out)
         if self.use_res:
-            print('shortcut', x.size())
+            # print('shortcut', x.size())
             out += self.shortcut(x)
         out = torch.tanh(out)
         out = self.dropout(out)
@@ -950,10 +950,10 @@ class MultiRatesDilatedResCNN(nn.Module):
                 else:
                     tmp = md(tmp)
             tmp = tmp.transpose(1, 2)
-            print('tmp', tmp.size())
+            # print('tmp', tmp.size())
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
-        print("x", x.size())
+        # print("x", x.size())
 
         y = self.output_layer(x)
         # y = self.cornet(y)
