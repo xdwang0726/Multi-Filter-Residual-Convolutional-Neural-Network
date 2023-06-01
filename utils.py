@@ -181,7 +181,7 @@ def load_embeddings(embed_file):
     with open(embed_file) as ef:
         for line in ef:
             line = line.rstrip().split()
-            vec = np.array(line[1:]).astype(np.float)
+            vec = np.array(line[1:]).astype(float)
             vec = vec / float(np.linalg.norm(vec) + 1e-6)
             W.append(vec)
         #UNK embedding, gaussian randomly initialized
