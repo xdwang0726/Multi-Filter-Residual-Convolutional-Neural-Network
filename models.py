@@ -836,13 +836,13 @@ class DilatedResidualBlock(nn.Module):
         dilation_rates = args.dilation_rates.split(',')
 
         self.left = nn.Sequential(
-            nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding=int(floor(dilation_rates[0]*(kernel_size-1) / 2)), bias=False, dilation=dilation_rates[0]),
+            nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding=int(floor(int(dilation_rates[0])*(kernel_size-1) / 2)), bias=False, dilation=int(dilation_rates[0])),
             nn.BatchNorm1d(outchannel),
             nn.Tanh(),
-            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(dilation_rates[1]*(kernel_size-1) / 2)), bias=False, dilation=dilation_rates[1]),
+            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(int(dilation_rates[1])*(kernel_size-1) / 2)), bias=False, dilation=int(dilation_rates[1])),
             nn.BatchNorm1d(outchannel),
             nn.Tanh(),
-            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(dilation_rates[2] * (kernel_size - 1) / 2)), bias=False, dilation=dilation_rates[2]),
+            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(int(dilation_rates[2]) * (kernel_size - 1) / 2)), bias=False, dilation=int(dilation_rates[2])),
             nn.BatchNorm1d(outchannel)
         )
         # self.se = SE_Block(outchannel)
