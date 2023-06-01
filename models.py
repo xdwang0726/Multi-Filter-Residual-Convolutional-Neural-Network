@@ -830,21 +830,26 @@ class DilatedCNN(nn.Module):
 
 
 class DilatedResidualBlock(nn.Module):
-    def __init__(self, inchannel, outchannel, kernel_size, stride, use_res, dropout, dilation_rate):
+    def __init__(self, args, inchannel, outchannel, kernel_size, stride, use_res, dropout, dilation_rate):
         super(DilatedResidualBlock, self).__init__()
+
+        dilation_rates = args.dilation_rates.split(',')
+
         self.left = nn.Sequential(
-            nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding=int(floor(kernel_size / 2)), bias=False, dilation=dilation_rate),
+            nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding=int(floor(dilation_rates[0]*(kernel_size-1) / 2)), bias=False, dilation=dilation_rates[0]),
             nn.BatchNorm1d(outchannel),
             nn.Tanh(),
-            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(kernel_size / 2)), bias=False, dilation=dilation_rate),
+            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(dilation_rates[1]*(kernel_size-1) / 2)), bias=False, dilation=dilation_rates[1]),
+            nn.BatchNorm1d(outchannel),
+            nn.Tanh(),
+            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(dilation_rates[2] * (kernel_size - 1) / 2)), bias=False, dilation=dilation_rates[2]),
             nn.BatchNorm1d(outchannel)
         )
         # self.se = SE_Block(outchannel)
         self.use_res = use_res
         if self.use_res:
             self.shortcut = nn.Sequential(
-                        nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, padding=int(floor(kernel_size / 2)),
-                                  bias=False, dilation=dilation_rate),
+                        nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, bias=False, dilation=dilation_rate),
                         nn.BatchNorm1d(outchannel)
                     )
 
@@ -855,8 +860,9 @@ class DilatedResidualBlock(nn.Module):
         print('out', out.size())
         # out = self.se(out)
         if self.use_res:
-            print('shortcut', self.shortcut(x).size())
-            out += self.shortcut(x)
+            print('shortcut', x.size())
+            #out += self.shortcut(x)
+            out += x
         out = torch.tanh(out)
         out = self.dropout(out)
         return out
