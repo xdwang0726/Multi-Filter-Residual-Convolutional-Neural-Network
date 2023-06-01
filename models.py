@@ -1037,10 +1037,10 @@ class MultiFilterDilatedResCNN(nn.Module):
                 else:
                     tmp = md(tmp)
             tmp = tmp.transpose(1, 2)
-            print('tmp', tmp.size())
+            # print('tmp', tmp.size())
             conv_result.append(tmp)
         x = torch.cat(conv_result, dim=2)
-        print("x", x.size())
+        # print("x", x.size())
 
         y = self.output_layer(x)
         # y = self.cornet(y)
