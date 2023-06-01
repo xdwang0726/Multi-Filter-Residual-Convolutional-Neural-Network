@@ -863,28 +863,23 @@ class DilatedResidualBlock(nn.Module):
 
 
 class MultiLevelDilatedResidualBlock(nn.Module):
-    def __init__(self, args, inchannel, outchannel, kernel_size, stride, use_res, dropout, dilation_rate):
+    def __init__(self, args, inchannel, outchannel, kernel_size, stride, use_res, dropout):
         super(MultiLevelDilatedResidualBlock, self).__init__()
 
         dilation_rates = args.dilation_rates.split(',')
 
         self.left = nn.Sequential(
-            nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding=int(floor(int(dilation_rates[0])*(kernel_size-1) / 2)), bias=False, dilation=int(dilation_rates[0])),
+            nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding="same", bias=False, dilation=int(dilation_rates[0])),
             nn.BatchNorm1d(outchannel),
             nn.Tanh(),
-            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(int(dilation_rates[1])*(kernel_size-1) / 2)), bias=False, dilation=int(dilation_rates[1])),
+            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding="same", bias=False, dilation=int(dilation_rates[1])),
             nn.BatchNorm1d(outchannel),
             nn.Tanh(),
-            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=int(floor(int(dilation_rates[2]) * (kernel_size - 1) / 2)), bias=False, dilation=int(dilation_rates[2])),
+            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding="same", bias=False, dilation=int(dilation_rates[2])),
             nn.BatchNorm1d(outchannel)
         )
         # self.se = SE_Block(outchannel)
         self.use_res = use_res
-        if self.use_res:
-            self.shortcut = nn.Sequential(
-                        nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, bias=False, dilation=dilation_rate),
-                        nn.BatchNorm1d(outchannel)
-                    )
 
         self.dropout = nn.Dropout(p=dropout)
 
@@ -967,69 +962,64 @@ class MultiRatesDilatedResCNN(nn.Module):
             p.requires_grad = False
 
 
-# class MultiDilatedResCNN(nn.Module):
-#
-#     def __init__(self, args, Y, dicts, cornet_dim=1000, n_cornet_blocks=2):
-#         super(MultiDilatedResCNN, self).__init__()
-#
-#         self.word_rep = WordRep(args, Y, dicts)
-#
-#         self.conv = nn.ModuleList()
-#         dilation_rates = args.dilation_rates.split(',')
-#
-#         self.filter_num = len(dilation_rates)
-#             dilation_rate = int(dilation_rate)
-#             one_channel = nn.ModuleList()
-#             tmp = nn.Conv1d(self.word_rep.feature_size, self.word_rep.feature_size, kernel_size=args.kernel_size,
-#                             padding="same", dilation=dilation_rate)
-#             xavier_uniform(tmp.weight)
-#             one_channel.add_module('baseconv', tmp)
-#
-#             conv_dimension = self.word_rep.conv_dict[args.conv_layer]
-#             for idx in range(args.conv_layer):
-#                 tmp = DilatedResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], args.kernel_size, 1, True, args.dropout, dilation_rate)
-#                 one_channel.add_module('resconv-{}'.format(idx), tmp)
-#
-#             self.conv.add_module('channel-{}'.format(dilation_rate), one_channel)
-#
-#         self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
-#
-#         # corNet
-#         self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
-#
-#         self.loss_function = nn.BCEWithLogitsLoss()
-#
-#     def forward(self, x, target):
-#
-#         # x = self.word_rep(x, target, text_inputs)
-#         x = self.word_rep(x, target)
-#
-#         x = x.transpose(1, 2)
-#
-#         conv_result = []
-#         for conv in self.conv:
-#             tmp = x
-#             for idx, md in enumerate(conv):
-#                 if idx == 0:
-#                     tmp = torch.tanh(md(tmp))
-#                 else:
-#                     tmp = md(tmp)
-#             tmp = tmp.transpose(1, 2)
-#             print('tmp', tmp.size())
-#             conv_result.append(tmp)
-#         x = torch.cat(conv_result, dim=2)
-#         print("x", x.size())
-#
-#         y = self.output_layer(x)
-#         y = self.cornet(y)
-#
-#         loss = self.loss_function(y, target)
-#
-#         return y, loss
-#
-#     def freeze_net(self):
-#         for p in self.word_rep.embed.parameters():
-#             p.requires_grad = False
+class MultiDilatedResCNN(nn.Module):
+    def __init__(self, args, Y, dicts, cornet_dim=1000, n_cornet_blocks=2):
+        super(MultiDilatedResCNN, self).__init__()
+
+        self.word_rep = WordRep(args, Y, dicts)
+
+        self.conv = nn.ModuleList()
+
+        one_channel = nn.ModuleList()
+        tmp = nn.Conv1d(self.word_rep.feature_size, self.word_rep.feature_size, kernel_size=args.kernel_size,padding="same")
+        xavier_uniform(tmp.weight)
+        one_channel.add_module('baseconv', tmp)
+
+        conv_dimension = self.word_rep.conv_dict[args.conv_layer]
+        for idx in range(args.conv_layer):
+            tmp = MultiLevelDilatedResidualBlock(args, conv_dimension[idx], conv_dimension[idx + 1], args.kernel_size, 1, True, args.dropout)
+            one_channel.add_module('resconv-{}'.format(idx), tmp)
+
+        self.conv.add_module('channel-multilevel_dilated_residual', one_channel)
+
+        self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
+
+        # corNet
+        # self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
+
+        self.loss_function = nn.BCEWithLogitsLoss()
+
+    def forward(self, x, target):
+
+        # x = self.word_rep(x, target, text_inputs)
+        x = self.word_rep(x, target)
+
+        x = x.transpose(1, 2)
+
+        conv_result = []
+        for conv in self.conv:
+            tmp = x
+            for idx, md in enumerate(conv):
+                if idx == 0:
+                    tmp = torch.tanh(md(tmp))
+                else:
+                    tmp = md(tmp)
+            tmp = tmp.transpose(1, 2)
+            print('tmp', tmp.size())
+            conv_result.append(tmp)
+        x = torch.cat(conv_result, dim=2)
+        print("x", x.size())
+
+        y = self.output_layer(x)
+        y = self.cornet(y)
+
+        loss = self.loss_function(y, target)
+
+        return y, loss
+
+    def freeze_net(self):
+        for p in self.word_rep.embed.parameters():
+            p.requires_grad = False
 
 
 class MultiDilatedCNN(nn.Module):
@@ -1189,6 +1179,8 @@ def pick_model(args, dicts, num_class):
         model = MultiResCNNMaskedLabelAtten(args, num_class, dicts)
     elif args.model == 'DilatedCNN':
         model = MultiRatesDilatedResCNN(args, num_class, dicts)
+    elif args.model == 'MultiLevelDilatedRes':
+        model = MultiDilatedResCNN(args, num_class, dicts)
     elif args.model == 'RNN_DCNN':
         model = RNN_DCNN(args, num_class, dicts)
     else:
