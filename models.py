@@ -851,8 +851,10 @@ class DilatedResidualBlock(nn.Module):
 
     def forward(self, x):
         out = self.left(x)
+        print('out', out.size())
         # out = self.se(out)
         if self.use_res:
+            print('shortcut', self.shortcut(x).size())
             out += self.shortcut(x)
         out = torch.tanh(out)
         out = self.dropout(out)
