@@ -661,7 +661,7 @@ class MyDataset(Dataset):
         return self.X[idx]
 
 
-def pad_sequence(x, max_len, type=np.int):
+def pad_sequence(x, max_len, type=int):
 
     padded_x = np.zeros((len(x), max_len), dtype=type)
     for i, row in enumerate(x):
