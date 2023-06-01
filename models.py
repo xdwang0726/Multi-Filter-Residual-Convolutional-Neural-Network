@@ -830,8 +830,41 @@ class DilatedCNN(nn.Module):
 
 
 class DilatedResidualBlock(nn.Module):
-    def __init__(self, args, inchannel, outchannel, kernel_size, stride, use_res, dropout, dilation_rate):
+    def __init__(self, inchannel, outchannel, kernel_size, stride, use_res, dropout, dilation_rate):
         super(DilatedResidualBlock, self).__init__()
+
+        self.left = nn.Sequential(
+            nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding=dilation_rate, bias=False, dilation=dilation_rate),
+            nn.BatchNorm1d(outchannel),
+            nn.Tanh(),
+            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=dilation_rate, bias=False, dilation=dilation_rate),
+            nn.BatchNorm1d(outchannel),
+        )
+        # self.se = SE_Block(outchannel)
+        self.use_res = use_res
+        if self.use_res:
+            self.shortcut = nn.Sequential(
+                        nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, bias=False, dilation=dilation_rate),
+                        nn.BatchNorm1d(outchannel)
+                    )
+
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x):
+        out = self.left(x)
+        print('out', out.size())
+        # out = self.se(out)
+        if self.use_res:
+            print('shortcut', x.size())
+            out += self.shortcut(x)
+        out = torch.tanh(out)
+        out = self.dropout(out)
+        return out
+
+
+class MultiLevelDilatedResidualBlock(nn.Module):
+    def __init__(self, args, inchannel, outchannel, kernel_size, stride, use_res, dropout, dilation_rate):
+        super(MultiLevelDilatedResidualBlock, self).__init__()
 
         dilation_rates = args.dilation_rates.split(',')
 
@@ -889,7 +922,7 @@ class MultiLevelDilatedResCNN(nn.Module):
 
             conv_dimension = self.word_rep.conv_dict[args.conv_layer]
             for idx in range(args.conv_layer):
-                tmp = DilatedResidualBlock(args, conv_dimension[idx], conv_dimension[idx + 1], args.kernel_size, 1, True, args.dropout, dilation_rate)
+                tmp = DilatedResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], args.kernel_size, 1, True, args.dropout, dilation_rate)
                 one_channel.add_module('resconv-{}'.format(idx), tmp)
 
             self.conv.add_module('channel-{}'.format(dilation_rate), one_channel)
