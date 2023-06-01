@@ -982,7 +982,7 @@ class MultiDilatedResCNN(nn.Module):
 
         self.conv.add_module('channel-multilevel_dilated_residual', one_channel)
 
-        self.output_layer = OutputLayer(args, Y, dicts, self.filter_num * args.num_filter_maps)
+        self.output_layer = OutputLayer(args, Y, dicts, args.num_filter_maps)
 
         # corNet
         # self.cornet = CorNet(Y, cornet_dim, n_cornet_blocks)
