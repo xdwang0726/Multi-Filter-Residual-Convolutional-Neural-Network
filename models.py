@@ -843,7 +843,8 @@ class DilatedResidualBlock(nn.Module):
         self.use_res = use_res
         if self.use_res:
             self.shortcut = nn.Sequential(
-                        nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, bias=False, dilation=dilation_rate),
+                        nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, padding=int(floor(kernel_size / 2)),
+                                  bias=False, dilation=dilation_rate),
                         nn.BatchNorm1d(outchannel)
                     )
 
