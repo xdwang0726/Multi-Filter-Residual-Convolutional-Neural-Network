@@ -880,8 +880,7 @@ class MultiLevelDilatedResCNN(nn.Module):
 
             conv_dimension = self.word_rep.conv_dict[args.conv_layer]
             for idx in range(args.conv_layer):
-                tmp = ResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], args.kernel_size, 1, True,
-                                    args.dropout, dilation_rate)
+                tmp = ResidualBlock(conv_dimension[idx], conv_dimension[idx + 1], args.kernel_size, 1, True, args.dropout, dilation_rate)
                 one_channel.add_module('resconv-{}'.format(idx), tmp)
 
             self.conv.add_module('channel-{}'.format(dilation_rate), one_channel)
