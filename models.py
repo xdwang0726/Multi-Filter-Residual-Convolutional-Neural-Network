@@ -831,7 +831,7 @@ class DilatedCNN(nn.Module):
 
 class DilatedResidualBlock(nn.Module):
     def __init__(self, inchannel, outchannel, kernel_size, stride, use_res, dropout, dilation_rate):
-        super(ResidualBlock, self).__init__()
+        super(DilatedResidualBlock, self).__init__()
         self.left = nn.Sequential(
             nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding=int(floor(kernel_size / 2)), bias=False, dilation=dilation_rate),
             nn.BatchNorm1d(outchannel),
