@@ -834,17 +834,17 @@ class DilatedResidualBlock(nn.Module):
         super(DilatedResidualBlock, self).__init__()
 
         self.left = nn.Sequential(
-            nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding=dilation_rate, bias=False, dilation=dilation_rate),
+            nn.Conv1d(inchannel, outchannel, kernel_size=kernel_size, stride=stride, padding="same", bias=False, dilation=dilation_rate),
             nn.BatchNorm1d(outchannel),
             nn.Tanh(),
-            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding=dilation_rate, bias=False, dilation=dilation_rate),
+            nn.Conv1d(outchannel, outchannel, kernel_size=kernel_size, stride=1, padding="same", bias=False, dilation=dilation_rate),
             nn.BatchNorm1d(outchannel),
         )
         # self.se = SE_Block(outchannel)
         self.use_res = use_res
         if self.use_res:
             self.shortcut = nn.Sequential(
-                        nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, bias=False, dilation=dilation_rate),
+                        nn.Conv1d(inchannel, outchannel, kernel_size=1, stride=stride, padding="same", bias=False, dilation=dilation_rate),
                         nn.BatchNorm1d(outchannel)
                     )
 
@@ -916,7 +916,7 @@ class MultiLevelDilatedResCNN(nn.Module):
             dilation_rate = int(dilation_rate)
             one_channel = nn.ModuleList()
             tmp = nn.Conv1d(self.word_rep.feature_size, self.word_rep.feature_size, kernel_size=args.kernel_size,
-                            padding=int(floor(args.kernel_size / 2)), dilation=dilation_rate)
+                            padding="same", dilation=dilation_rate)
             xavier_uniform(tmp.weight)
             one_channel.add_module('baseconv', tmp)
 
