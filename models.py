@@ -1011,7 +1011,7 @@ class MultiDilatedResCNN(nn.Module):
         print("x", x.size())
 
         y = self.output_layer(x)
-        y = self.cornet(y)
+        # y = self.cornet(y)
 
         loss = self.loss_function(y, target)
 
