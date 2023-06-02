@@ -1381,6 +1381,8 @@ def pick_model(args, dicts, num_class):
         model = MultiDilatedResCNN(args, num_class, dicts)
     elif args.model == 'MultiFilterDilatedResCNN':
         model = MultiFilterDilatedResCNN(args, num_class, dicts)
+    elif args.model == 'MultiFilterDilatedResCNN_MaskedAtten':
+        model = MultiFilterDilatedResCNN_with_MaskedLabelAtten(args, num_class, dicts)
     elif args.model == 'RNN_DCNN':
         model = RNN_DCNN(args, num_class, dicts)
     else:

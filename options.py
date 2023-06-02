@@ -16,7 +16,7 @@ parser.add_argument("-version", type=str, choices=['mimic2', 'mimic3'], default=
 parser.add_argument("-MAX_LENGTH", type=int, default=3500)
 
 # model
-parser.add_argument("-model", type=str, choices=['CNN', 'MultiCNN', 'ResCNN', 'DilatedCNN', 'MultiResCNN', 'MultiResCNN_GCN', 'MultiSeResCNN_GCN', 'RNN_GCN', 'DilatedCNN_MaskedAtten', 'MultiResCNNLabelAtten', 'MultiResCNNMaskedLabelAtten', 'MultiLevelDilatedRes', 'MultiFilterDilatedResCNN', 'RNN_DCNN'], default='MultiSeResCNN_GCN')
+parser.add_argument("-model", type=str, choices=['CNN', 'MultiCNN', 'ResCNN', 'DilatedCNN', 'MultiResCNN', 'MultiResCNN_GCN', 'MultiSeResCNN_GCN', 'RNN_GCN', 'DilatedCNN_MaskedAtten', 'MultiResCNNLabelAtten', 'MultiResCNNMaskedLabelAtten', 'MultiLevelDilatedRes', 'MultiFilterDilatedResCNN', 'MultiFilterDilatedResCNN_MaskedAtten', 'RNN_DCNN'], default='MultiSeResCNN_GCN')
 parser.add_argument("-filter_size", type=str, default="3, 5, 9, 15, 19, 25")
 parser.add_argument("-dilation_rates", type=str, default="1, 2, 4")
 parser.add_argument("-kernel_size", type=int, default=3, help='single kernel')
